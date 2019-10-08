@@ -2,9 +2,9 @@ import cv2
 import rospy
 import numpy as np
 import geometry_msgs
-import sensor_msgs
+from sensor_msgs.msg import Image, CameraInfo
 import message_filters
-import uwds3_msgs
+from uwds3_msgs.msg import EntityArray, Entity
 from cv_bridge import CvBridge
 from tf import transformations
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster
@@ -36,7 +36,7 @@ class Uwds3Perception(object):
         rospy.loginfo("Subscribing to /{} topic...".format(self.camera_info_topic))
         self.camera_info = None
         self.camera_frame_id = None
-        self.camera_info_subscriber = rospy.Subscriber(self.camera_info_topic, sensor_msgs.msg.CameraInfo, self.camera_info_callback)
+        self.camera_info_subscriber = rospy.Subscriber(self.camera_info_topic, CameraInfo, self.camera_info_callback)
 
         self.detector_model_filename = rospy.get_param("~detector_model_filename", "")
         self.detector_weights_filename = rospy.get_param("~detector_weights_filename", "")
@@ -60,22 +60,22 @@ class Uwds3Perception(object):
 
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
-        self.human_tracker = HumanTracker(iou_distance, min_distance=0.7, max_disappeared=8, max_age=10)
+        self.human_tracker = HumanTracker(iou_distance, n_init=5, min_distance=0.7, max_disappeared=8, max_age=10)
 
-        #self.tracks_publisher = rospy.Publisher("uwds3_perception/human_tracks", uwds3_msgs.msg.EntityArray, queue_size=1)
+        self.tracks_publisher = rospy.Publisher("uwds3_perception/tracks", EntityArray, queue_size=1)
 
-        self.visualization_publisher = rospy.Publisher("uwds3_perception/visualization", sensor_msgs.msg.Image, queue_size=1)
+        self.visualization_publisher = rospy.Publisher("uwds3_perception/visualization", Image, queue_size=1)
 
         if self.use_depth is True:
-            self.rgb_image_sub = message_filters.Subscriber(self.rgb_image_topic, sensor_msgs.msg.Image)
-            self.depth_image_sub = message_filters.Subscriber(self.depth_image_topic, sensor_msgs.msg.Image)
+            self.rgb_image_sub = message_filters.Subscriber(self.rgb_image_topic, Image)
+            self.depth_image_sub = message_filters.Subscriber(self.depth_image_topic, Image)
 
             self.sync = message_filters.TimeSynchronizer([self.rgb_image_sub, self.depth_image_sub], 10)
             self.depth_estimator = DepthEstimator()
             self.sync.registerCallback(self.observation_callback)
 
         else:
-            self.rgb_image_sub = rospy.Subscriber(self.rgb_image_topic, sensor_msgs.msg.Image, self.observation_callback, queue_size=1)
+            self.rgb_image_sub = rospy.Subscriber(self.rgb_image_topic, Image, self.observation_callback, queue_size=1)
 
 
     def camera_info_callback(self, msg):
@@ -95,9 +95,9 @@ class Uwds3Perception(object):
             detection_timer = cv2.getTickCount()
             detections = []
             if self.frame_count % self.n_frame == 0:
-                detections = self.face_detector.detect(rgb_image)
-            if self.frame_count % self.n_frame == 1:
                 detections = self.detector.detect(rgb_image)
+            if self.frame_count % self.n_frame == 1:
+                detections = self.face_detector.detect(rgb_image)
             self.frame_count += 1
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
@@ -121,24 +121,48 @@ class Uwds3Perception(object):
             else:
                 tracks = human_tracks
 
+            entity_array = EntityArray()
+
             for track in tracks:
-                draw_track(viz_frame, track, self.camera_matrix, self.dist_coeffs)
-                if track.rotation is not None and track.translation is not None:
-                    transform = geometry_msgs.msg.TransformStamped()
-                    transform.header.stamp = rospy.Time.now()
-                    transform.header.frame_id = self.camera_frame_id
-                    transform.child_frame_id = track.class_label+"_"+track.uuid[:6]
-                    transform.transform.translation.x = track.translation[0]
-                    transform.transform.translation.y = track.translation[1]
-                    transform.transform.translation.z = track.translation[2]
-                    q_rot = transformations.quaternion_from_euler(track.rotation[0], track.rotation[1], track.rotation[2], "rxyz")
-                    transform.transform.rotation.x = q_rot[0]
-                    transform.transform.rotation.y = q_rot[1]
-                    transform.transform.rotation.z = q_rot[2]
-                    transform.transform.rotation.w = q_rot[3]
-                    self.tf_broadcaster.sendTransform(transform)
+                if track.is_confirmed():
+                    draw_track(viz_frame, track, self.camera_matrix, self.dist_coeffs)
+                    if track.rotation is not None and track.translation is not None:
+                        transform = geometry_msgs.msg.TransformStamped()
+                        transform.header.stamp = rgb_image_msg.header.stamp
+                        transform.header.frame_id = self.camera_frame_id
+                        transform.child_frame_id = track.class_label+"_"+track.uuid[:6]
+                        transform.transform.translation.x = track.translation[0]
+                        transform.transform.translation.y = track.translation[1]
+                        transform.transform.translation.z = track.translation[2]
+                        q_rot = transformations.quaternion_from_euler(track.rotation[0], track.rotation[1], track.rotation[2], "rxyz")
+                        transform.transform.rotation.x = q_rot[0]
+                        transform.transform.rotation.y = q_rot[1]
+                        transform.transform.rotation.z = q_rot[2]
+                        transform.transform.rotation.w = q_rot[3]
+                        self.tf_broadcaster.sendTransform(transform)
+
+                    entity = Entity()
+                    entity.type = Entity.AGENT if track.class_label in self.body_parts else Entity.OBJECT
+                    entity.id = track.uuid
+                    entity.label = track.class_label
+                    if track.translation is not None and track.rotation is not None:
+                        entity.is_located = True
+                        entity.pose.pose.position.x = track.translation[0]
+                        entity.pose.pose.position.y = track.translation[1]
+                        entity.pose.pose.position.z = track.translation[2]
+                        entity.pose.pose.orientation.x = q_rot[0]
+                        entity.pose.pose.orientation.y = q_rot[1]
+                        entity.pose.pose.orientation.z = q_rot[2]
+                        entity.pose.pose.orientation.w = q_rot[3]
+                    else:
+                        entity.is_located = False
+                    entity.has_shape = False
+                    entity.last_update = rgb_image_msg.header.stamp
+                    entity.expiration_time = rgb_image_msg.header.stamp + rospy.Duration(3.0)
+                    entity_array.entities.append(entity)
 
             viz_img_msg = self.bridge.cv2_to_imgmsg(viz_frame)
+            self.tracks_publisher.publish(entity_array)
             self.visualization_publisher.publish(viz_img_msg)
 
 

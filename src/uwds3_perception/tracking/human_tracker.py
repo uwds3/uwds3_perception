@@ -20,7 +20,7 @@ class HumanTracker(object):
         self.tracks = []
         self.human_tracks = []
         self.iou_assignment = LinearAssignment(iou_distance, min_distance=min_distance)
-        #self.overlap_assignment = LinearAssignment(overlap_distance)
+        self.euler_assignment = LinearAssignment(euler_distance)
         shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
         self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
         self.head_pose_estimator = HeadPoseEstimator()
@@ -46,8 +46,6 @@ class HumanTracker(object):
         for detection_indice in unmatched_detections:
             self.start_track(rgb_image, detections[detection_indice])
 
-        self.tracks = [t for t in self.tracks if not t.is_deleted()]
-
         face_tracks = [t for t in self.tracks if t.class_label=="face"]
 
         for face_track in face_tracks:
@@ -57,37 +55,22 @@ class HumanTracker(object):
             else:
                 success, rot, trans = self.head_pose_estimator.estimate(shape, camera_matrix, dist_coeffs, previous_head_pose=(face_track.rotation.reshape((3,1)), face_track.translation.reshape((3,1))))
             if success is True:
-                face_track.rotation = rot.reshape((3,))
-                face_track.translation = trans.reshape((3,))
+                face_track.filter(rot.reshape((3,)), trans.reshape((3,)))
                 face_track.properties["facial_landmarks"] = shape
 
-        # person_tracks = [t for t in self.tracks if t.class_label=="person"]
+        person_tracks = [t for t in self.tracks if t.class_label=="person" and t.is_confirmed()]
 
-        # matches, unmatched_persons, unmatched_humans = self.iou_assignment.match(self.human_tracks, person_tracks)
-        #
-        # for person_indice, human_indice in matches:
-        #     self.human_tracks[human_indice].update_track("person", self.tracks[person_indice])
-        #
-        # for human_indice in unmatched_humans:
-        #     self.human_tracks[human_indice].mark_missed()
-        #
-        # for person_indice in unmatched_persons:
-        #     self.start_human_track(self.tracks[person_indice])
-        #
-        # matches, unmatched_faces, unmatched_humans = self.overlap_assignment.match(self.human_tracks, face_tracks)
-        #
-        # for face_indice, human_indice in matches:
-        #     #print "update face"
-        #     self.human_tracks[human_indice].update_track("face", self.tracks[face_indice])
-        #     #print self.human_tracks[human_indice].rotation
-        #
-        # self.human_tracks = [t for t in self.human_tracks if not t.is_deleted()]
+        matches, unmatched_faces, unmatched_humans = self.euler_assignment.match(person_tracks, face_tracks)
+
+        for face_indice, person_indice in matches:
+            face_tracks[face_indice].uuid = person_tracks[person_indice].uuid
+
+        for face_indice in unmatched_faces:
+            face_tracks[face_indice].mark_missed()
+
+        self.tracks = [t for t in self.tracks if not t.is_deleted()]
 
         return self.tracks
-    #
-    # def start_human_track(self, person_track):
-    #     self.human_tracks.append(HumanTrack(person_track))
-    #     return len(self.human_tracks)-1
 
     def start_track(self, rgb_image, detection):
         self.tracks.append(Track(detection, self.n_init, self.max_disappeared, self.max_age))

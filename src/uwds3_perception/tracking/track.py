@@ -1,7 +1,9 @@
 import dlib
+import numpy as np
 import uuid
 import multiprocessing
 from .kalman_stabilizer import Stabilizer
+from uwds3_msgs.msg import Entity
 
 
 class TrackState:
@@ -54,7 +56,11 @@ class Track(object):
 
         self.first_kalman_update = True
 
-        self.stabilizer = Stabilizer()
+        self.stabilizers = [Stabilizer(
+                            state_num=2,
+                            measure_num=1,
+                            cov_process=0.1,
+                            cov_measure=0.1) for _ in range(6)]
 
         self.input_queue = multiprocessing.Queue()
         self.output_queue = multiprocessing.Queue()
@@ -91,7 +97,21 @@ class Track(object):
             self.state = TrackState.CONFIRMED
 
     def filter(self, rotation, translation):
-        pass
+        if self.first_kalman_update is True:
+            self.first_kalman_update = False
+            self.filter(rotation, translation)
+            self.filter(rotation, translation)
+            self.filter(rotation, translation)
+        else:
+            stable_pose = []
+            pose_np = np.array((rotation, translation)).flatten()
+            for value, ps_stb in zip(pose_np, self.stabilizers):
+                ps_stb.update([value])
+                stable_pose.append(ps_stb.state[0])
+
+            stable_pose = np.reshape(stable_pose, (-1, 3))
+            self.rotation = stable_pose[0]
+            self.translation = stable_pose[1]
 
     def predict(self, rgb_image=None):
         self.age += 1
