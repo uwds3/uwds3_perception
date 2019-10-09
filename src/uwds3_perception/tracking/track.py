@@ -16,7 +16,8 @@ class TrackState:
 def run_tracker(rgb_image, bbox, input_queue, output_queue):
     tracker = dlib.correlation_tracker()
     tracker.start_track(rgb_image, bbox)
-    while True:
+    dont_stop = True
+    while dont_stop:
         rgb, bbox = input_queue.get()
         if rgb is not None:
             if bbox is not None:
@@ -25,6 +26,8 @@ def run_tracker(rgb_image, bbox, input_queue, output_queue):
                 tracker.update(rgb)
             bbox = tracker.get_position()
             output_queue.put(bbox)
+        else:
+            dont_stop = False
 
 
 class Track(object):
@@ -82,7 +85,7 @@ class Track(object):
         self.tracker = process
 
     def stop_tracker(self):
-        del self.tracker
+        self.input_queue.put((None, None))
 
     def update(self, bbox, rgb_image=None):
         if rgb_image is not None:
@@ -135,6 +138,9 @@ class Track(object):
             if self.age > self.max_age:
                 self.state = TrackState.DELETED
 
+    def to_delete(self):
+        self.state = TrackState.DELETED
+
     def is_perceived(self):
         if not self.is_deleted():
             return self.state != TrackState.OCCLUDED
@@ -152,3 +158,6 @@ class Track(object):
 
     def __str__(self):
         return "rect : {} for class : {}".format(self.bbox, self.class_label)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop_tracker()

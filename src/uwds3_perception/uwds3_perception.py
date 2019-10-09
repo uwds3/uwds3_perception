@@ -54,13 +54,13 @@ class Uwds3Perception(object):
         self.n_frame = rospy.get_param("~n_frame", 2)
         self.frame_count = 0
 
-        self.only_human = rospy.get_param("~only_human", True)
+        self.only_human = rospy.get_param("~only_human", False)
 
         self.use_depth = rospy.get_param("~use_depth", False)
 
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
-        self.human_tracker = HumanTracker(iou_distance, n_init=5, min_distance=0.7, max_disappeared=8, max_age=10)
+        self.human_tracker = HumanTracker(iou_distance, n_init=7, min_distance=0.6, max_disappeared=15, max_age=20)
 
         self.tracks_publisher = rospy.Publisher("uwds3_perception/tracks", EntityArray, queue_size=1)
 
@@ -101,25 +101,20 @@ class Uwds3Perception(object):
             self.frame_count += 1
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
-            human_detections = [d for d in detections if d.class_label in self.body_parts]
-            object_detections = [d for d in detections if d.class_label not in self.body_parts]
-
             tracking_timer = cv2.getTickCount()
             if self.only_human is False:
-                object_tracks = self.object_tracker.update(rgb_image, object_detections)
-            human_tracks = self.human_tracker.update(rgb_image, human_detections, self.camera_matrix, self.dist_coeffs)
+                tracks = self.human_tracker.update(rgb_image, detections, self.camera_matrix, self.dist_coeffs)
+            else:
+                detections = [d for d in detections if d.class_label in self.body_parts]
+            tracks = self.human_tracker.update(rgb_image, detections, self.camera_matrix, self.dist_coeffs)
             tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
 
             detection_fps_str = "Detection fps : %0.4fhz" % detection_fps
             tracking_fps_str = "Tracking and pose estimation fps : %0.4fhz" % tracking_fps
 
-            cv2.putText(viz_frame, detection_fps_str, (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            cv2.putText(viz_frame, tracking_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-
-            if self.only_human is False:
-                tracks = human_tracks + object_tracks
-            else:
-                tracks = human_tracks
+            cv2.putText(viz_frame, "nb detection/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.putText(viz_frame, detection_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.putText(viz_frame, tracking_fps_str, (5, 65),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
             entity_array = EntityArray()
 
@@ -147,6 +142,7 @@ class Uwds3Perception(object):
                     entity.label = track.class_label
                     if track.translation is not None and track.rotation is not None:
                         entity.is_located = True
+                        entity.pose.header.frame_id = self.camera_frame_id
                         entity.pose.pose.position.x = track.translation[0]
                         entity.pose.pose.position.y = track.translation[1]
                         entity.pose.pose.position.z = track.translation[2]

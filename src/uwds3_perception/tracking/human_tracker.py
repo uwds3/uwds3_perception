@@ -1,5 +1,6 @@
 import numpy as np
 import rospy
+import math
 from .linear_assignment import LinearAssignment, iou_distance, euler_distance
 from uwds3_perception.estimation.facial_landmarks_estimator import FacialLandmarksEstimator
 from uwds3_perception.estimation.head_pose_estimator import HeadPoseEstimator
@@ -26,6 +27,8 @@ class HumanTracker(object):
         self.head_pose_estimator = HeadPoseEstimator()
 
     def update(self, rgb_image, detections, camera_matrix, dist_coeffs, depth_image=None):
+        image_weight, image_height, _ = rgb_image.shape
+
         matches, unmatched_detections, unmatched_tracks = self.iou_assignment.match(self.tracks, detections)
 
         for detection_indice, track_indice in matches:
@@ -48,12 +51,24 @@ class HumanTracker(object):
 
         face_tracks = [t for t in self.tracks if t.class_label=="face"]
 
-        for face_track in face_tracks:
-            shape = self.facial_landmarks_estimator.estimate(rgb_image, face_track)
+        x_center = image_weight/2
+        y_center = image_weight/2
+
+        min_indice = None
+        min_distance = 10000
+        for face_track_indice, face_track in enumerate(face_tracks):
+            x_track_center = face_track.bbox.center().x
+            y_track_center = face_track.bbox.center().y
+            distance_from_center = math.sqrt(pow(x_center-x_track_center, 2)+pow(y_center-y_track_center, 2))
+            if distance_from_center < min_distance:
+                min_distance = distance_from_center
+                min_indice = face_track_indice
+        if min_indice is not None:
+            shape = self.facial_landmarks_estimator.estimate(rgb_image, face_tracks[min_indice])
             if face_track.rotation is None or face_track.translation is None:
                 success, rot, trans = self.head_pose_estimator.estimate(shape, camera_matrix, dist_coeffs)
             else:
-                success, rot, trans = self.head_pose_estimator.estimate(shape, camera_matrix, dist_coeffs, previous_head_pose=(face_track.rotation.reshape((3,1)), face_track.translation.reshape((3,1))))
+                success, rot, trans = self.head_pose_estimator.estimate(shape, camera_matrix, dist_coeffs, previous_head_pose=(face_tracks[min_indice].rotation.reshape((3,1)), face_tracks[min_indice].translation.reshape((3,1))))
             if success is True:
                 face_track.filter(rot.reshape((3,)), trans.reshape((3,)))
                 face_track.properties["facial_landmarks"] = shape
@@ -66,7 +81,7 @@ class HumanTracker(object):
             face_tracks[face_indice].uuid = person_tracks[person_indice].uuid
 
         for face_indice in unmatched_faces:
-            face_tracks[face_indice].mark_missed()
+            face_tracks[face_indice].to_delete()
 
         self.tracks = [t for t in self.tracks if not t.is_deleted()]
 
