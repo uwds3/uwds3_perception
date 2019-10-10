@@ -24,6 +24,7 @@ class LinearAssignment(object):
         for d, det in enumerate(detections):
             for t, trk in enumerate(tracks):
                 C[d, t] = self.cost_metric(det, trk)
+
         # Run the optimization problem
         M = linear_assignment(C)
 
@@ -74,8 +75,12 @@ def cosine_distance(track, detection):
 
 def overlap_ratio(track, detection):
     track_area = track.bbox.area()
-    detection_area = detection.bbox.area()
-    return track_area/float( detection_area)
+    x_top_left = min(track.bbox.left(), detection.bbox.left())
+    y_top_left = min(track.bbox.top(), detection.bbox.top())
+    x_right_bottom = max(track.bbox.right(), detection.bbox.right())
+    y_right_bottom = max(track.bbox.bottom(), detection.bbox.bottom())
+    intersection_area = dlib.rectangle(int(x_top_left), int(y_top_left), int(x_right_bottom), int(y_right_bottom)).area()
+    return track_area/float(intersection_area)
 
 def euler_distance(track, detection):
     t_cx = track.bbox.center().x

@@ -60,7 +60,7 @@ class Uwds3Perception(object):
 
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
-        self.human_tracker = HumanTracker(iou_distance, n_init=7, min_distance=0.6, max_disappeared=15, max_age=20)
+        self.human_tracker = HumanTracker(iou_distance, n_init=7, min_distance=0.9, max_disappeared=15, max_age=20)
 
         self.tracks_publisher = rospy.Publisher("uwds3_perception/tracks", EntityArray, queue_size=1)
 
@@ -88,6 +88,7 @@ class Uwds3Perception(object):
 
     def observation_callback(self, rgb_image_msg, depth_image_msg=None):
         if self.camera_info is not None:
+            perception_timer = cv2.getTickCount()
             bgr_image = self.bridge.imgmsg_to_cv2(rgb_image_msg)
             rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
             viz_frame = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
@@ -108,13 +109,15 @@ class Uwds3Perception(object):
                 detections = [d for d in detections if d.class_label in self.body_parts]
             tracks = self.human_tracker.update(rgb_image, detections, self.camera_matrix, self.dist_coeffs)
             tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
-
+            perception_fps = cv2.getTickFrequency() / (cv2.getTickCount() - perception_timer)
             detection_fps_str = "Detection fps : %0.4fhz" % detection_fps
             tracking_fps_str = "Tracking and pose estimation fps : %0.4fhz" % tracking_fps
+            perception_fps_str = "Perception fps : %0.4fhz" % perception_fps
 
             cv2.putText(viz_frame, "nb detection/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.putText(viz_frame, detection_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.putText(viz_frame, tracking_fps_str, (5, 65),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.putText(viz_frame, perception_fps_str, (5, 85),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
             entity_array = EntityArray()
 

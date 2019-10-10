@@ -16,8 +16,7 @@ class TrackState:
 def run_tracker(rgb_image, bbox, input_queue, output_queue):
     tracker = dlib.correlation_tracker()
     tracker.start_track(rgb_image, bbox)
-    dont_stop = True
-    while dont_stop:
+    while True:
         rgb, bbox = input_queue.get()
         if rgb is not None:
             if bbox is not None:
@@ -26,8 +25,6 @@ def run_tracker(rgb_image, bbox, input_queue, output_queue):
                 tracker.update(rgb)
             bbox = tracker.get_position()
             output_queue.put(bbox)
-        else:
-            dont_stop = False
 
 
 class Track(object):
@@ -63,10 +60,10 @@ class Track(object):
                             state_num=2,
                             measure_num=1,
                             cov_process=0.1,
-                            cov_measure=0.1) for _ in range(6)]
+                            cov_measure=0.05) for _ in range(6)]
 
-        self.input_queue = multiprocessing.Queue()
-        self.output_queue = multiprocessing.Queue()
+        self.input_queue = None
+        self.output_queue = None
 
         self.age = 1
         self.hits = 1
@@ -74,6 +71,9 @@ class Track(object):
         self.properties = {}
 
     def start_tracker(self, bbox, rgb_image):
+
+        self.input_queue = multiprocessing.Queue()
+        self.output_queue = multiprocessing.Queue()
 
         process = multiprocessing.Process(target=run_tracker,
                                           args=(rgb_image,
@@ -85,10 +85,13 @@ class Track(object):
         self.tracker = process
 
     def stop_tracker(self):
-        self.input_queue.put((None, None))
+        if self.tracker is not None:
+            self.input_queue.close()
+            self.output_queue.close()
+            self.tracker.terminate()
 
     def update(self, bbox, rgb_image=None):
-        if rgb_image is not None:
+        if rgb_image is not None and self.tracker is not None:
             self.input_queue.put((rgb_image, bbox))
             bbox = self.output_queue.get()
         self.age = 0
@@ -118,7 +121,7 @@ class Track(object):
 
     def predict(self, rgb_image=None):
         self.age += 1
-        if rgb_image is not None:
+        if rgb_image is not None and self.tracker is not None:
             self.input_queue.put((rgb_image, None))
             self.bbox = self.output_queue.get()
         else:
