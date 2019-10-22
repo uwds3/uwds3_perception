@@ -73,6 +73,7 @@ def iou_distance(track, detection):
 def cosine_distance(track, detection):
     return cosine(track.feature, detection.feature)
 
+
 def overlap_ratio(track, detection):
     track_area = track.bbox.area()
     x_top_left = min(track.bbox.left(), detection.bbox.left())
@@ -82,7 +83,8 @@ def overlap_ratio(track, detection):
     intersection_area = dlib.rectangle(int(x_top_left), int(y_top_left), int(x_right_bottom), int(y_right_bottom)).area()
     return track_area/float(intersection_area)
 
-def euler_distance(track, detection):
+
+def euler2d_distance(track, detection):
     t_cx = track.bbox.center().x
     t_cy = track.bbox.center().y
     d_cx = detection.bbox.center().x

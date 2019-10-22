@@ -3,7 +3,7 @@ import numpy as np
 import uuid
 import multiprocessing
 from .kalman_stabilizer import Stabilizer
-from uwds3_msgs.msg import Entity
+from uwds3_msgs.msg import SceneNode
 
 
 class TrackState:
@@ -11,20 +11,6 @@ class TrackState:
     CONFIRMED = 2
     OCCLUDED = 3
     DELETED = 4
-
-
-def run_tracker(rgb_image, bbox, input_queue, output_queue):
-    tracker = dlib.correlation_tracker()
-    tracker.start_track(rgb_image, bbox)
-    while True:
-        rgb, bbox = input_queue.get()
-        if rgb is not None:
-            if bbox is not None:
-                tracker.update(rgb, bbox)
-            else:
-                tracker.update(rgb)
-            bbox = tracker.get_position()
-            output_queue.put(bbox)
 
 
 class Track(object):
@@ -56,14 +42,26 @@ class Track(object):
 
         self.first_kalman_update = True
 
-        self.stabilizers = [Stabilizer(
-                            state_num=2,
-                            measure_num=1,
-                            cov_process=0.1,
-                            cov_measure=0.05) for _ in range(6)]
+        self.translation_cov = 0.98
 
-        self.input_queue = None
-        self.output_queue = None
+        self.rotation_cov = 0.1
+
+        r_stabilizers = [Stabilizer(
+                        state_num=2,
+                        measure_num=1,
+                        cov_process=0.1,
+                        cov_measure=self.rotation_cov) for _ in range(3)]
+
+        t_stabilizers = [Stabilizer(
+                        state_num=2,
+                        measure_num=1,
+                        cov_process=0.1,
+                        cov_measure=self.translation_cov) for _ in range(3)]
+
+        self.stabilizers = r_stabilizers + t_stabilizers
+
+        # self.input_queue = None
+        # self.output_queue = None
 
         self.age = 1
         self.hits = 1
@@ -71,29 +69,34 @@ class Track(object):
         self.properties = {}
 
     def start_tracker(self, bbox, rgb_image):
-
-        self.input_queue = multiprocessing.Queue()
-        self.output_queue = multiprocessing.Queue()
-
-        process = multiprocessing.Process(target=run_tracker,
-                                          args=(rgb_image,
-                                                bbox,
-                                                self.input_queue,
-                                                self.output_queue))
-        process.daemon = True
-        process.start()
-        self.tracker = process
+        #
+        # self.input_queue = multiprocessing.Queue()
+        # self.output_queue = multiprocessing.Queue()
+        #
+        # process = multiprocessing.Process(target=run_tracker,
+        #                                   args=(rgb_image,
+        #                                         bbox,
+        #                                         self.input_queue,
+        #                                         self.output_queue))
+        # process.daemon = True
+        # process.start()
+        # self.tracker = process
+        self.tracker = dlib.correlation_tracker()
+        self.tracker.start_track(rgb_image, bbox)
 
     def stop_tracker(self):
         if self.tracker is not None:
-            self.input_queue.close()
-            self.output_queue.close()
-            self.tracker.terminate()
+            # self.input_queue.close()
+            # self.output_queue.close()
+            # self.tracker.terminate()
+            self.tracker = None
 
     def update(self, bbox, rgb_image=None):
         if rgb_image is not None and self.tracker is not None:
-            self.input_queue.put((rgb_image, bbox))
-            bbox = self.output_queue.get()
+            # self.input_queue.put((rgb_image, bbox))
+            # bbox = self.output_queue.get()
+            self.tracker.update(rgb_image, bbox)
+            bbox = self.tracker.get_position()
         self.age = 0
         self.bbox = bbox
         self.hits += 1
@@ -122,8 +125,10 @@ class Track(object):
     def predict(self, rgb_image=None):
         self.age += 1
         if rgb_image is not None and self.tracker is not None:
-            self.input_queue.put((rgb_image, None))
-            self.bbox = self.output_queue.get()
+            # self.input_queue.put((rgb_image, None))
+            # self.bbox = self.output_queue.get()
+            self.tracker.update(rgb_image)
+            self.bbox = self.tracker.get_position()
         else:
             pass # TODO perform kalman prediction
         if self.age > self.max_age:

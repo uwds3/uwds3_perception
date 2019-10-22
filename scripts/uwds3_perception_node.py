@@ -7,9 +7,9 @@ from uwds3_perception.uwds3_perception import Uwds3Perception
 
 class Uwds3PerceptionNode(object):
     def __init__(self):
-        rospy.loginfo("Starting Underworlds perception...")
+        rospy.loginfo("[perception] Starting Underworlds perception...")
         self.underworlds_core = Uwds3Perception()
-        rospy.loginfo("Underworlds perception ready !")
+        rospy.loginfo("[perception] Underworlds perception ready !")
 
     def run(self):
         while not rospy.is_shutdown():
