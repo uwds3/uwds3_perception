@@ -19,6 +19,7 @@
 
   <arg name="use_gui" default="true"/>
   <arg name="use_depth" default="true"/>
+  <arg name="use_faces" default="true"/>
 
   <node name="uwds3_perception" pkg="uwds3_perception" type="uwds3_perception_node.py" args="" output="screen" respawn="false">
     <rosparam subst_value="true">
@@ -40,6 +41,7 @@
 
       use_gui: $(arg use_gui)
       use_depth: $(arg use_depth)
+      use_faces: $(arg use_faces)
     </rosparam>
   </node>
 

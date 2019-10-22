@@ -1,7 +1,6 @@
 import numpy as np
 import dlib
 import cv2
-import multiprocessing
 
 POINT_OF_SIGHT = 27
 RIGHT_EYE_CORNER = 36
@@ -20,8 +19,6 @@ CHIN = 8
 class FacialLandmarksEstimator(object):
     def __init__(self, shape_predictor_config_file):
         self.predictor = dlib.shape_predictor(shape_predictor_config_file)
-        #self.input_queue = multiprocessing.Queue()
-        #self.output_queue = multiprocessing.Queue()
 
     def estimate(self, rgb_image, face_track):
         bbox = face_track.bbox

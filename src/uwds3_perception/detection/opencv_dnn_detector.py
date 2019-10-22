@@ -90,10 +90,8 @@ class OpenCVDNNDetector(object):
         scores = boxes[:, 4]
 
         area = (x2 - x1 + 1) * (y2 - y1 + 1)
-        if scores is not None:
-            idxs = np.argsort(scores)
-        else:
-            idxs = np.argsort(y2)
+
+        idxs = np.argsort(scores)
 
         while len(idxs) > 0:
             last = len(idxs) - 1
