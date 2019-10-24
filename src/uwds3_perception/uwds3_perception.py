@@ -12,6 +12,41 @@ from tf2_ros import Buffer, TransformListener, TransformBroadcaster
 from .detection.opencv_dnn_detector import OpenCVDNNDetector
 from .tracking.tracker import Tracker
 from .tracking.linear_assignment import iou_distance
+from .estimation.shape_estimator import ShapeEstimator
+
+class HumanVisualModel(object):
+    FOV = 60.0 # human field of view
+    WIDTH = 90 # image width resolution for rendering
+    HEIGHT = 68  # image height resolution for rendering
+    CLIPNEAR = 0.3 # clipnear
+    CLIPFAR = 1e+3 # clipfar
+    ASPECT = 1.333 # aspect ratio for rendering
+    SACCADE_THRESHOLD = 0.01 # angular variation in rad/s
+    SACCADE_ESPILON = 0.005 # error in angular variation
+    FOCUS_DISTANCE_FIXATION = 0.1 # focus distance when performing a fixation
+    FOCUS_DISTANCE_SACCADE = 0.5 # focus distance when performing a saccade
+
+    def get_camera_info(self):
+        camera_info = CameraInfo()
+        width = HumanVisualModel.WIDTH
+        height = HumanVisualModel.HEIGHT
+        camera_info.width = width
+        camera_info.height = height
+        focal_length = height
+        center = (height/2, width/2)
+        camera_matrix = np.array([[focal_length, 0, center[0]],
+                                 [0, focal_length, center[1]],
+                                 [0, 0, 1]], dtype="double")
+        P_matrix = np.array([[focal_length, 0, center[0], 0],
+                            [0, focal_length, center[1], 0],
+                            [0, 0, 1, 0]], dtype="double")
+
+        dist_coeffs = np.zeros((4, 1))
+        camera_info.distortion_model = "blob"
+        camera_info.D = list(dist_coeffs)
+        camera_info.K = list(camera_matrix.flatten())
+        camera_info.P = list(P_matrix.flatten())
+        return camera_info
 
 
 class Uwds3Perception(object):
@@ -46,6 +81,8 @@ class Uwds3Perception(object):
 
         self.body_parts = ["person", "face", "right_hand", "left_hand"]
 
+        self.shape_estimator = ShapeEstimator()
+
         self.detector = OpenCVDNNDetector(self.detector_model_filename,
                                           self.detector_weights_filename,
                                           self.detector_config_filename,
@@ -67,11 +104,15 @@ class Uwds3Perception(object):
 
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
-        self.tracker = Tracker(iou_distance, n_init=10, min_distance=0.8, max_disappeared=4, max_age=15)
+        self.n_init = rospy.get_param("~n_init", 6)
+        self.min_iou_distance = rospy.get_param("~min_iou_distance", 0.8)
+        self.max_disappeared = rospy.get_param("~max_disappeared", 15)
 
-        self.tracks_publisher = rospy.Publisher("uwds3_perception/tracks", SceneNodeArrayStamped, queue_size=1)
+        self.tracker = Tracker(iou_distance, n_init=self.n_init, min_distance=self.min_iou_distance, max_disappeared=7, max_age=15)
 
-        self.visualization_publisher = rospy.Publisher("uwds3_perception/visualization", Image, queue_size=1)
+        self.tracks_publisher = rospy.Publisher("tracks", SceneNodeArrayStamped, queue_size=1)
+
+        self.visualization_publisher = rospy.Publisher("tracks_image", Image, queue_size=1)
 
         if self.use_depth is True:
             rospy.loginfo("[perception] Subscribing to '/{}' topic...".format(self.rgb_image_topic))
@@ -86,6 +127,8 @@ class Uwds3Perception(object):
             rospy.loginfo("[perception] Subscribing to '/{}' topic...".format(self.rgb_image_topic))
             self.rgb_image_sub = rospy.Subscriber(self.rgb_image_topic, Image, self.observation_callback, queue_size=1)
 
+        self.previous_camera_pose = None
+        self.camera_motion = None
 
     def camera_info_callback(self, msg):
         if self.camera_info is None:
@@ -102,6 +145,8 @@ class Uwds3Perception(object):
             rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
             if depth_image_msg is not None:
                 depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg)
+            else:
+                depth_image = None
             viz_frame = rgb_image
 
             detection_timer = cv2.getTickCount()
@@ -129,7 +174,7 @@ class Uwds3Perception(object):
             tracking_fps_str = "Tracking and pose estimation fps : {:0.4f}hz".format(tracking_fps)
             perception_fps_str = "Perception fps : {:0.4f}hz".format(perception_fps)
 
-            cv2.putText(viz_frame, "nb detection/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.putText(viz_frame, "Nb detections/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.putText(viz_frame, detection_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.putText(viz_frame, tracking_fps_str, (5, 65),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.putText(viz_frame, perception_fps_str, (5, 85),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
@@ -139,7 +184,7 @@ class Uwds3Perception(object):
 
             for track in tracks:
                 self.draw_track(viz_frame, track, self.camera_matrix, self.dist_coeffs)
-                if track.is_confirmed():
+                if track.is_confirmed() or track.is_occluded():
                     if track.rotation is not None and track.translation is not None:
                         transform = geometry_msgs.msg.TransformStamped()
                         transform.header = rgb_image_msg.header
@@ -170,16 +215,23 @@ class Uwds3Perception(object):
                         entity.position.pose.pose.orientation.w = q_rot[3]
                     else:
                         entity.is_located = False
-                    entity.has_shape = True
 
-                    entity.shape = PrimitiveShape(type=PrimitiveShape.BOX, dimensions=[track.bbox.width(), track.bbox.height()])
+                    success, shape = self.shape_estimator.estimate(track, self.camera_matrix, self.dist_coeffs)
+                    entity.has_shape = success
+                    if success is True:
+                        entity.shape = shape
 
                     if "facial_landmarks" in track.properties:
                         feature = []
                         for (x, y) in track.properties["facial_landmarks"]:
-                            feature.append(float(x))
-                            feature.append(float(y))
-                        entity.properties.append(Feature(name="facial_landmarks", data=feature))
+                            feature.append(float(x)/rgb_image.shape[0])
+                            feature.append(float(y)//rgb_image.shape[1])
+                        entity.features.append(Feature(name="facial_landmarks", data=feature))
+
+                    if entity.label == "face":
+                        entity.has_camera = True
+                        entity.camera = HumanVisualModel().get_camera_info()
+                        entity.camera.header.frame_id = track.class_label+"_"+track.uuid[:6]
                     entity.last_update = rgb_image_msg.header.stamp
                     entity.expiration_time = rgb_image_msg.header.stamp + rospy.Duration(3.0)
                     entity_array.nodes.append(entity)
@@ -187,7 +239,7 @@ class Uwds3Perception(object):
             viz_img_msg = self.bridge.cv2_to_imgmsg(viz_frame)
             self.tracks_publisher.publish(entity_array)
             self.visualization_publisher.publish(viz_img_msg)
-#
+
 # def get_last_transform_from_tf2(self, source_frame, target_frame):
 #         try:
 #             trans = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))

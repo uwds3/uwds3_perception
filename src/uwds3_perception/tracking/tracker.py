@@ -103,7 +103,7 @@ class Tracker(object):
                     if estimate_trans is True:
                         success, trans = self.translation_estimator.estimate(track.bbox, depth_image, camera_matrix, dist_coeffs)
                         if success is True:
-                            rot = np.array([0.0, 0.0, 0.0])
+                            rot = np.array([math.pi/2, 0.0, 0.0])
                             track.filter(rot, trans)
 
         person_tracks = [t for t in self.tracks if t.class_label=="person"]
@@ -112,11 +112,6 @@ class Tracker(object):
 
         for face_indice, person_indice in matches:
             face_tracks[face_indice].uuid = person_tracks[person_indice].uuid
-
-        # for face_indice in unmatched_faces:
-        #     face_tracks[face_indice].to_delete()
-        #
-        # self.tracks = [t for t in self.tracks if not t.is_deleted()]
 
         return self.tracks
 

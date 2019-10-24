@@ -1,0 +1,7 @@
+numpy
+scipy>=0.14
+uuid
+scikit-image
+scikit-learn
+dlib
+opencv-python

@@ -7,7 +7,7 @@ from .facial_landmarks_estimator import RIGHT_EYE_CORNER, LEFT_EYE_CORNER, LEFT_
 class HeadPoseEstimator(object):
     def __init__(self):
         self.model_3d = np.float32([[0.0, 0.0, 0.0], # nose
-                                    [0.0, -340.0, -65.0], # chin
+                                    [0.0, -330.0, -65.0], # chin
                                     [-225.0, 170.0, -135.0], # left eye corner
                                     [225.0, 170.0, -135.0], # right eye corner
                                     [-150.0, -150.0, -125.0], # left mouth corner

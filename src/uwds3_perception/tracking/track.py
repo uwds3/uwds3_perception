@@ -1,10 +1,7 @@
 import dlib
 import numpy as np
 import uuid
-import multiprocessing
 from .kalman_stabilizer import Stabilizer
-from uwds3_msgs.msg import SceneNode
-
 
 class TrackState:
     TENTATIVE = 1
@@ -60,41 +57,21 @@ class Track(object):
 
         self.stabilizers = r_stabilizers + t_stabilizers
 
-        # self.input_queue = None
-        # self.output_queue = None
-
         self.age = 1
         self.hits = 1
 
         self.properties = {}
 
     def start_tracker(self, bbox, rgb_image):
-        #
-        # self.input_queue = multiprocessing.Queue()
-        # self.output_queue = multiprocessing.Queue()
-        #
-        # process = multiprocessing.Process(target=run_tracker,
-        #                                   args=(rgb_image,
-        #                                         bbox,
-        #                                         self.input_queue,
-        #                                         self.output_queue))
-        # process.daemon = True
-        # process.start()
-        # self.tracker = process
         self.tracker = dlib.correlation_tracker()
         self.tracker.start_track(rgb_image, bbox)
 
     def stop_tracker(self):
         if self.tracker is not None:
-            # self.input_queue.close()
-            # self.output_queue.close()
-            # self.tracker.terminate()
             self.tracker = None
 
     def update(self, bbox, rgb_image=None):
         if rgb_image is not None and self.tracker is not None:
-            # self.input_queue.put((rgb_image, bbox))
-            # bbox = self.output_queue.get()
             self.tracker.update(rgb_image, bbox)
             bbox = self.tracker.get_position()
         self.age = 0
@@ -108,6 +85,7 @@ class Track(object):
     def filter(self, rotation, translation):
         if self.first_kalman_update is True:
             self.first_kalman_update = False
+            self.filter(rotation, translation)
             self.filter(rotation, translation)
             self.filter(rotation, translation)
             self.filter(rotation, translation)
@@ -125,19 +103,20 @@ class Track(object):
     def predict(self, rgb_image=None):
         self.age += 1
         if rgb_image is not None and self.tracker is not None:
-            # self.input_queue.put((rgb_image, None))
-            # self.bbox = self.output_queue.get()
             self.tracker.update(rgb_image)
             self.bbox = self.tracker.get_position()
         else:
             pass # TODO perform kalman prediction
-        if self.age > self.max_age:
-            self.state = TrackState.DELETED
+        if self.age > self.max_disappeared:
+            self.state = TrackState.OCCLUDED
+        if self.state == TrackState.OCCLUDED:
+            if self.age > self.max_age:
+                self.state = TrackState.DELETED
 
     def mark_missed(self):
         self.age += 1
         if self.state == TrackState.TENTATIVE:
-            if self.age > self.max_disappeared:
+            if self.age > self.n_init:
                 self.state = TrackState.DELETED
         if self.state == TrackState.CONFIRMED:
             if self.age > self.max_disappeared:

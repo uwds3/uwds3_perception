@@ -55,7 +55,8 @@ class CameraPublisher(object):
     def timer_callback(self, event):
         ok, frame = self.capture.read()
         if ok:
-            rgb_image_msg = self.bridge.cv2_to_imgmsg(frame)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb_image_msg = self.bridge.cv2_to_imgmsg(rgb_frame)
             rgb_image_msg.header.stamp = rospy.Time()
             self.camera_publisher.publish(rgb_image_msg)
             self.camera_info_publisher.publish(self.camera_info)
