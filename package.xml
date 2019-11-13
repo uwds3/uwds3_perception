@@ -52,6 +52,7 @@
   <depend>rospy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>uwds3_msgs</depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

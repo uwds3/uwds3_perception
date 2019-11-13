@@ -16,15 +16,16 @@ class ShapeVisualizerNode(object):
         self.track_marker = {}
         self.track_color = {}
         self.last_marker_id = 0
-        self.markers_publisher = rospy.Publisher("geometry_markers", MarkerArray, queue_size=1)
+        self.markers_publisher = rospy.Publisher(self.tracks_topic+"_viz", MarkerArray, queue_size=1)
         self.track_subscriber = rospy.Subscriber(self.tracks_topic, SceneNodeArrayStamped, self.observation_callback, queue_size=1)
+        rospy.loginfo("[visualizer] Shape visualizer ready !")
 
     def observation_callback(self, tracks_msg):
         markers_msg = MarkerArray()
         perceived_tracks = []
         for track in tracks_msg.nodes:
             if track.id in perceived_tracks:
-                rospy.logwarn("Error : shape already created")
+                rospy.logwarn("[visualizer] Error occured: Shape for node <{}> already created".format(track.id))
                 continue
             perceived_tracks.append(track.id)
             if track.has_shape is True:
@@ -36,9 +37,7 @@ class ShapeVisualizerNode(object):
                     self.last_marker_id += 1
                     marker.id = self.last_marker_id
                     marker.action = Marker.ADD
-                    uuid = track.id.split("_")[1]
-                    label = track.label
-                    frame = label + "_" + uuid[:6]
+                    frame = track.id
                     marker.header.frame_id = frame
                     self.track_marker[track.id] = marker
                 marker.header.stamp = tracks_msg.header.stamp
@@ -65,6 +64,7 @@ class ShapeVisualizerNode(object):
                     color.b = np.random.random_sample()
                     self.track_color[track.id] = color
                 marker.color = color
+                marker.pose = track.shape.pose
                 self.track_marker[track.id] = marker
                 markers_msg.markers.append(marker)
             if track.has_camera is True:

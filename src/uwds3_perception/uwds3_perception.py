@@ -6,7 +6,7 @@ from sensor_msgs.msg import Image, CameraInfo
 import message_filters
 from uwds3_msgs.msg import SceneNodeArrayStamped, SceneNode, Feature, PrimitiveShape
 from cv_bridge import CvBridge
-from tf import transformations
+from tf import transformations as tfm
 import tf2_ros
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster
 from .detection.opencv_dnn_detector import OpenCVDNNDetector
@@ -62,7 +62,7 @@ class Uwds3Perception(object):
         self.depth_camera_info_topic = rospy.get_param("~depth_camera_info_topic", "/camera/depth/camera_info")
 
         self.base_frame_id = rospy.get_param("~base_frame_id", "base_link")
-        self.global_frame_id = rospy.get_param("~global_frame_id", "map")
+        self.global_frame_id = rospy.get_param("~global_frame_id", "odom")
 
         self.bridge = CvBridge()
 
@@ -102,6 +102,8 @@ class Uwds3Perception(object):
 
         self.use_depth = rospy.get_param("~use_depth", False)
 
+        self.publish_tf = rospy.get_param("~publish_tf", True)
+
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
         self.n_init = rospy.get_param("~n_init", 6)
@@ -138,16 +140,16 @@ class Uwds3Perception(object):
         self.camera_matrix = np.array(msg.K).reshape((3, 3))
         self.dist_coeffs = np.array(msg.D)
 
-    def observation_callback(self, rgb_image_msg, depth_image_msg=None):
+    def observation_callback(self, bgr_image_msg, depth_image_msg=None):
         if self.camera_info is not None:
             perception_timer = cv2.getTickCount()
-            bgr_image = self.bridge.imgmsg_to_cv2(rgb_image_msg)
+            bgr_image = self.bridge.imgmsg_to_cv2(bgr_image_msg, "bgr8")
             rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
             if depth_image_msg is not None:
                 depth_image = self.bridge.imgmsg_to_cv2(depth_image_msg)
             else:
                 depth_image = None
-            viz_frame = rgb_image
+            viz_frame = bgr_image
 
             detection_timer = cv2.getTickCount()
             detections = []
@@ -158,7 +160,10 @@ class Uwds3Perception(object):
                     detections = self.face_detector.detect(rgb_image)
                 self.frame_count += 1
             else:
-                detections = self.detector.detect(rgb_image)
+                if self.frame_count % self.n_frame == 0:
+                    detections = self.detector.detect(rgb_image)
+                else:
+                    detections = []
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
             tracking_timer = cv2.getTickCount()
@@ -180,81 +185,114 @@ class Uwds3Perception(object):
             cv2.putText(viz_frame, perception_fps_str, (5, 85),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
             entity_array = SceneNodeArrayStamped()
-            entity_array.header = rgb_image_msg.header
+            entity_array.header = bgr_image_msg.header
 
             for track in tracks:
                 self.draw_track(viz_frame, track, self.camera_matrix, self.dist_coeffs)
                 if track.is_confirmed() or track.is_occluded():
-                    if track.rotation is not None and track.translation is not None:
-                        transform = geometry_msgs.msg.TransformStamped()
-                        transform.header = rgb_image_msg.header
-                        transform.header.frame_id = self.camera_frame_id
-                        transform.child_frame_id = track.class_label+"_"+track.uuid[:6]
-                        transform.transform.translation.x = track.translation[0]
-                        transform.transform.translation.y = track.translation[1]
-                        transform.transform.translation.z = track.translation[2]
-                        q_rot = transformations.quaternion_from_euler(track.rotation[0], track.rotation[1], track.rotation[2], "rxyz")
-                        transform.transform.rotation.x = q_rot[0]
-                        transform.transform.rotation.y = q_rot[1]
-                        transform.transform.rotation.z = q_rot[2]
-                        transform.transform.rotation.w = q_rot[3]
-                        self.tf_broadcaster.sendTransform(transform)
+                    success, t, q = self.get_transform_from_tf2(self.global_frame_id, self.camera_frame_id, time=bgr_image_msg.header.stamp)
+                    if success:
+                        if track.rotation is not None and track.translation is not None:
+                            tf_track = np.dot(tfm.translation_matrix(track.translation), tfm.euler_matrix(track.rotation[0], track.rotation[1], track.rotation[2], "rxyz"))
+                            tf_sensor = np.dot(tfm.translation_matrix(t), tfm.quaternion_matrix(q))
+                            tf_track_global = np.dot(tf_sensor, tf_track)
+                            q_final = tfm.quaternion_from_matrix(tf_track_global)
+                            t_final = tfm.translation_from_matrix(tf_track_global)
+                            transform = geometry_msgs.msg.TransformStamped()
+                            transform.header = bgr_image_msg.header
+                            transform.header.frame_id = self.global_frame_id
+                            transform.child_frame_id = track.class_label+"_"+track.uuid.replace("-", "")
+                            transform.transform.translation.x = t_final[0]
+                            transform.transform.translation.y = t_final[1]
+                            transform.transform.translation.z = t_final[2]
+                            if track.class_label == "face":
+                                transform.transform.rotation.x = q_final[0]
+                                transform.transform.rotation.y = q_final[1]
+                                transform.transform.rotation.z = q_final[2]
+                                transform.transform.rotation.w = q_final[3]
+                            else:
+                                transform.transform.rotation.x = 0.0
+                                transform.transform.rotation.y = 0.0
+                                transform.transform.rotation.z = 0.0
+                                transform.transform.rotation.w = 1.0
+                            self.tf_broadcaster.sendTransform(transform)
 
-                    entity = SceneNode()
-                    entity.label = track.class_label
-                    entity.id = track.class_label+"_"+track.uuid
-                    if track.translation is not None and track.rotation is not None:
-                        entity.is_located = True
-                        entity.position.header.frame_id = self.camera_frame_id
-                        entity.position.pose.pose.position.x = track.translation[0]
-                        entity.position.pose.pose.position.y = track.translation[1]
-                        entity.position.pose.pose.position.z = track.translation[2]
-                        entity.position.pose.pose.orientation.x = q_rot[0]
-                        entity.position.pose.pose.orientation.y = q_rot[1]
-                        entity.position.pose.pose.orientation.z = q_rot[2]
-                        entity.position.pose.pose.orientation.w = q_rot[3]
-                    else:
-                        entity.is_located = False
+                        entity = SceneNode()
+                        entity.label = track.class_label
+                        entity.id = track.class_label+"_"+track.uuid.replace("-", "")
+                        if track.translation is not None and track.rotation is not None:
+                            entity.is_located = True
+                            entity.position.header = bgr_image_msg.header
+                            entity.position.header.frame_id = self.global_frame_id
+                            entity.position.pose.pose.position.x = t_final[0]
+                            entity.position.pose.pose.position.y = t_final[1]
+                            entity.position.pose.pose.position.z = t_final[2]
+                            if track.class_label == "face":
+                                entity.position.pose.pose.orientation.x = q_final[0]
+                                entity.position.pose.pose.orientation.y = q_final[1]
+                                entity.position.pose.pose.orientation.z = q_final[2]
+                                entity.position.pose.pose.orientation.w = q_final[3]
+                            else:
+                                entity.position.pose.pose.orientation.x = 0.0
+                                entity.position.pose.pose.orientation.y = 0.0
+                                entity.position.pose.pose.orientation.z = 0.0
+                                entity.position.pose.pose.orientation.w = 1.0
+                        else:
+                            entity.is_located = False
 
-                    success, shape = self.shape_estimator.estimate(track, self.camera_matrix, self.dist_coeffs)
-                    entity.has_shape = success
-                    if success is True:
-                        entity.shape = shape
+                        success, shape = self.shape_estimator.estimate(track, self.camera_matrix, self.dist_coeffs)
+                        entity.has_shape = success
+                        if success is True:
+                            if track.class_label == "person":
+                                new_dim = []
+                                shape_height = shape.dimensions[2]
+                                center_height = t_final[2]
+                                height = center_height + shape_height/2
+                                new_dim.append(shape.dimensions[0])
+                                new_dim.append(shape.dimensions[1])
+                                new_dim.append(height)
+                                shape.dimensions = new_dim
+                                shape.pose.position.z = - (center_height - height/2)
+                            entity.shape = shape
 
-                    if "facial_landmarks" in track.properties:
-                        feature = []
-                        for (x, y) in track.properties["facial_landmarks"]:
-                            feature.append(float(x)/rgb_image.shape[0])
-                            feature.append(float(y)//rgb_image.shape[1])
-                        entity.features.append(Feature(name="facial_landmarks", data=feature))
+                        if "facial_landmarks" in track.properties:
+                            feature = []
+                            for (x, y) in track.properties["facial_landmarks"]:
+                                feature.append(float(x)/rgb_image.shape[0])
+                                feature.append(float(y)//rgb_image.shape[1])
+                            entity.features.append(Feature(name="facial_landmarks", data=feature))
 
-                    if entity.label == "face":
-                        entity.has_camera = True
-                        entity.camera = HumanVisualModel().get_camera_info()
-                        entity.camera.header.frame_id = track.class_label+"_"+track.uuid[:6]
-                    entity.last_update = rgb_image_msg.header.stamp
-                    entity.expiration_time = rgb_image_msg.header.stamp + rospy.Duration(3.0)
-                    entity_array.nodes.append(entity)
+                        if entity.label == "face":
+                            entity.has_camera = True
+                            entity.camera = HumanVisualModel().get_camera_info()
+                            entity.camera.header.frame_id = track.class_label+"_"+track.uuid[:6]
+                        entity.last_update = bgr_image_msg.header.stamp
+                        entity.expiration_time = bgr_image_msg.header.stamp + rospy.Duration(3.0)
+                        entity_array.nodes.append(entity)
 
             viz_img_msg = self.bridge.cv2_to_imgmsg(viz_frame)
             self.tracks_publisher.publish(entity_array)
             self.visualization_publisher.publish(viz_img_msg)
 
-# def get_last_transform_from_tf2(self, source_frame, target_frame):
-#         try:
-#             trans = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
-#             x = trans.transform.translation.x
-#             y = trans.transform.translation.y
-#             z = trans.transform.translation.z
-#
-#             rx = trans.transform.rotation.x
-#             ry = trans.transform.rotation.y
-#             rz = trans.transform.rotation.z
-#             rw = trans.transform.rotation.w
-#
-#             return True, [x, y, z], [rx, ry, rz, rw]
-#         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-#             return False, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
+    def get_transform_from_tf2(self, source_frame, target_frame, time=None):
+        try:
+            if time is not None:
+                trans = self.tf_buffer.lookup_transform(source_frame, target_frame, time)
+            else:
+                trans = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
+            x = trans.transform.translation.x
+            y = trans.transform.translation.y
+            z = trans.transform.translation.z
+
+            rx = trans.transform.rotation.x
+            ry = trans.transform.rotation.y
+            rz = trans.transform.rotation.z
+            rw = trans.transform.rotation.w
+
+            return True, [x, y, z], [rx, ry, rz, rw]
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn("[perception] Exception occured: {}".format(e))
+            return False, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
 
     def draw_track(self, rgb_image, track, camera_matrix, dist_coeffs):
         if track.is_confirmed():

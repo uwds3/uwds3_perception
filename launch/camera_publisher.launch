@@ -4,6 +4,7 @@
   <arg name="camera_info_topic" default="xtion/depth/camera_info"/>
   <arg name="rgb_image_topic" default="xtion/rgb/image_rect_color"/>
   <arg name="camera_frame_id" default="camera_link"/>
+  <arg name="global_frame_id" default="odom"/>
   <arg name="camera_pub_frequency" default="20.0"/>
 
   <node name="camera_publisher" pkg="uwds3_perception" type="camera_publisher_node.py" args="" output="screen" respawn="false">
@@ -14,5 +15,7 @@
       camera_pub_frequency: $(arg camera_pub_frequency)
     </rosparam>
   </node>
+
+  <node name="global2cam_publisher" pkg="tf2_ros" type="static_transform_publisher" args="0 0 1 1.57 3.14 1.57 $(arg global_frame_id) $(arg camera_frame_id)"/>
 
 </launch>
