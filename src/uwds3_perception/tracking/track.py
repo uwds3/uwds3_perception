@@ -83,12 +83,14 @@ class Track(object):
             self.state = TrackState.CONFIRMED
 
     def filter(self, rotation, translation):
+        stable_pose = []
         if self.first_kalman_update is True:
             self.first_kalman_update = False
-            self.filter(rotation, translation)
-            self.filter(rotation, translation)
-            self.filter(rotation, translation)
-            self.filter(rotation, translation)
+            pose_np = np.array((rotation, translation)).flatten()
+            for value, ps_stb in zip(pose_np, self.stabilizers):
+                ps_stb.state[0] = value
+                ps_stb.state[1] = 1000 # high covariance
+                stable_pose.append(ps_stb.state[0])
         else:
             stable_pose = []
             pose_np = np.array((rotation, translation)).flatten()
@@ -96,9 +98,9 @@ class Track(object):
                 ps_stb.update([value])
                 stable_pose.append(ps_stb.state[0])
 
-            stable_pose = np.reshape(stable_pose, (-1, 3))
-            self.rotation = stable_pose[0]
-            self.translation = stable_pose[1]
+        stable_pose = np.reshape(stable_pose, (-1, 3))
+        self.rotation = stable_pose[0]
+        self.translation = stable_pose[1]
 
     def predict(self, rgb_image=None):
         self.age += 1

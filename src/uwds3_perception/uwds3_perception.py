@@ -13,6 +13,8 @@ from .detection.opencv_dnn_detector import OpenCVDNNDetector
 from .tracking.tracker import Tracker
 from .tracking.linear_assignment import iou_distance
 from .estimation.shape_estimator import ShapeEstimator
+from .preprocessing.retina_filter import RetinaFilter
+
 
 class HumanVisualModel(object):
     FOV = 60.0 # human field of view
@@ -104,11 +106,16 @@ class Uwds3Perception(object):
 
         self.publish_tf = rospy.get_param("~publish_tf", True)
 
+        self.use_retina_filter = rospy.get_param("~use_retina_filter", False)
+        self.retina_filter_config_filename = rospy.get_param("~retina_filter_config_filename", "")
+        if self.use_retina_filter is True:
+            self.retina_filter = RetinaFilter(self.retina_filter_config_filename)
+
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
         self.n_init = rospy.get_param("~n_init", 6)
         self.min_iou_distance = rospy.get_param("~min_iou_distance", 0.8)
-        self.max_disappeared = rospy.get_param("~max_disappeared", 15)
+        self.max_disappeared = rospy.get_param("~max_disappeared", 30)
 
         self.tracker = Tracker(iou_distance, n_init=self.n_init, min_distance=self.min_iou_distance, max_disappeared=7, max_age=15)
 
@@ -157,13 +164,16 @@ class Uwds3Perception(object):
                 if self.frame_count % self.n_frame == 0:
                     detections = self.detector.detect(rgb_image)
                 if self.frame_count % self.n_frame == 1:
-                    detections = self.face_detector.detect(rgb_image)
-                self.frame_count += 1
+                    if self.use_retina_filter is True:
+                        bgr_image_filtered = self.retina_filter.filter(bgr_image)
+                        rgb_image_filtered = cv2.cvtColor(bgr_image_filtered, cv2.COLOR_BGR2RGB)
+                    detections = self.face_detector.detect(rgb_image_filtered)
             else:
                 if self.frame_count % self.n_frame == 0:
                     detections = self.detector.detect(rgb_image)
                 else:
                     detections = []
+            self.frame_count += 1
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
             tracking_timer = cv2.getTickCount()

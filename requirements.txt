@@ -4,4 +4,5 @@ uuid
 scikit-image
 scikit-learn
 dlib
+keras
 opencv-python
