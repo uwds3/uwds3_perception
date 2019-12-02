@@ -13,8 +13,6 @@ from .detection.opencv_dnn_detector import OpenCVDNNDetector
 from .tracking.tracker import Tracker
 from .tracking.linear_assignment import iou_distance
 from .estimation.shape_estimator import ShapeEstimator
-from .preprocessing.retina_filter import RetinaFilter
-
 
 class HumanVisualModel(object):
     FOV = 60.0 # human field of view
@@ -109,6 +107,7 @@ class Uwds3Perception(object):
         self.use_retina_filter = rospy.get_param("~use_retina_filter", False)
         self.retina_filter_config_filename = rospy.get_param("~retina_filter_config_filename", "")
         if self.use_retina_filter is True:
+            from .preprocessing.retina_filter import RetinaFilter
             self.retina_filter = RetinaFilter(self.retina_filter_config_filename)
 
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
@@ -167,7 +166,8 @@ class Uwds3Perception(object):
                     if self.use_retina_filter is True:
                         bgr_image_filtered = self.retina_filter.filter(bgr_image)
                         rgb_image_filtered = cv2.cvtColor(bgr_image_filtered, cv2.COLOR_BGR2RGB)
-                    detections = self.face_detector.detect(rgb_image_filtered)
+                        detections = self.face_detector.detect(rgb_image_filtered)
+                    detections = self.face_detector.detect(rgb_image)
             else:
                 if self.frame_count % self.n_frame == 0:
                     detections = self.detector.detect(rgb_image)

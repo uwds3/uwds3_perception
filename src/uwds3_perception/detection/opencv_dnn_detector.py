@@ -43,7 +43,7 @@ class OpenCVDNNDetector(object):
                 if self.config[class_id]["activated"] is True:
                     if confidence > self.config[class_id]["confidence_threshold"]:
 
-                        class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.65 else "unknown"
+                        class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.6 else "unknown"
                         x_top_left = int(detections[0, 0, i, 3] * cols)
                         y_top_left = int(detections[0, 0, i, 4] * rows)
                         x_right_bottom = int(detections[0, 0, i, 5] * cols)
