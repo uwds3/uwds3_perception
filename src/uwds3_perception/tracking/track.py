@@ -89,8 +89,8 @@ class Track(object):
             pose_np = np.array((rotation, translation)).flatten()
             for value, ps_stb in zip(pose_np, self.stabilizers):
                 ps_stb.state[0] = value
-                ps_stb.state[1] = 1000 # high covariance
-                stable_pose.append(ps_stb.state[0])
+                ps_stb.state[1] = 0
+                stable_pose.append(value)
         else:
             stable_pose = []
             pose_np = np.array((rotation, translation)).flatten()

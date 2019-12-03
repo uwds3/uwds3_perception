@@ -118,5 +118,5 @@ class Tracker(object):
     def start_track(self, rgb_image, detection):
         self.tracks.append(Track(detection, self.n_init, self.max_disappeared, self.max_age))
         if detection.class_label != "person" and detection.class_label != "face":
-            self.tracks[len(self.tracks)-1].start_tracker(detection.bbox, rgb_image)
+            pass#self.tracks[len(self.tracks)-1].start_tracker(detection.bbox, rgb_image)
         return len(self.tracks)-1
