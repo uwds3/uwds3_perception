@@ -1,33 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
 
+  <!-- Camera parameters -->
   <arg name="rgb_image_topic" default="xtion/rgb/image_rect_color"/>
   <arg name="rgb_camera_info_topic" default="xtion/rgb/camera_info"/>
-
   <arg name="depth_image_topic" default="xtion/depth/image_rect"/>
   <arg name="depth_camera_info_topic" default="xtion/depth/camera_info"/>
 
   <arg name="global_frame_id" default="odom"/>
 
-  <arg name="n_init" default="6"/>
-  <arg name="min_iou_distance" default="0.85"/>
-  <arg name="max_disappeared" default="30"/>
-
+  <!-- Detector model -->
   <arg name="detector_model_filename" default="$(find uwds3_perception)/models/detection/ssd_mobilenet_v2_coco_2018_03_29.pb"/>
   <arg name="detector_weights_filename" default="$(find uwds3_perception)/models/detection/ssd_mobilenet_v2_coco_2018_03_29.pbtxt"/>
   <arg name="detector_config_filename" default="$(find uwds3_perception)/config/detection/mscoco_config.yaml"/>
 
+  <!-- Face detector model -->
   <arg name="face_detector_model_filename" default="$(find uwds3_perception)/models/detection/opencv_face_detector_uint8.pb"/>
   <arg name="face_detector_weights_filename" default="$(find uwds3_perception)/models/detection/opencv_face_detector.pbtxt"/>
   <arg name="face_detector_config_filename" default="$(find uwds3_perception)/config/detection/face_config.yaml"/>
 
+  <!-- Retina filter parameters -->
+  <arg name="use_retina_filter" default="false"/>
   <arg name="retina_filter_config_filename" default="$(find uwds3_perception)/config/preprocessing/retina.xml"/>
 
+  <!-- Head pose estimation parameters -->
   <arg name="shape_predictor_config_filename" default="$(find uwds3_perception)/models/estimation/shape_predictor_68_face_landmarks.dat"/>
 
-  <arg name="use_gui" default="true"/>
+  <!-- Mode parameters -->
+  <arg name="publish_visualization_image" default="true"/>
   <arg name="use_depth" default="true"/>
   <arg name="use_faces" default="false"/>
+
+  <!-- Tracker parameters -->
+  <arg name="n_init" default="6"/>
+  <arg name="min_iou_distance" default="0.85"/>
+  <arg name="max_disappeared" default="30"/>
+  <arg name="max_age" default="60"/>
 
   <node name="uwds3_perception" pkg="uwds3_perception" type="uwds3_perception_node.py" args="" output="screen" respawn="false">
     <rosparam subst_value="true">
@@ -38,10 +46,6 @@
       depth_camera_info_topic: $(arg depth_camera_info_topic)
 
       global_frame_id: $(arg global_frame_id)
-
-      n_init: $(arg n_init)
-      min_iou_distance: $(arg min_iou_distance)
-      max_disappeared: $(arg max_disappeared)
 
       detector_model_filename: $(arg detector_model_filename)
       detector_weights_filename: $(arg detector_weights_filename)
@@ -55,9 +59,14 @@
 
       shape_predictor_config_filename: $(arg shape_predictor_config_filename)
 
-      use_gui: $(arg use_gui)
+      publish_visualization_image: $(arg publish_visualization_image)
       use_depth: $(arg use_depth)
       use_faces: $(arg use_faces)
+
+      n_init: $(arg n_init)
+      min_iou_distance: $(arg min_iou_distance)
+      max_disappeared: $(arg max_disappeared)
+      max_age: $(arg max_age)
     </rosparam>
   </node>
 

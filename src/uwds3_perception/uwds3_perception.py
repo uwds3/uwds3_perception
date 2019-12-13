@@ -4,7 +4,7 @@ import numpy as np
 import geometry_msgs
 from sensor_msgs.msg import Image, CameraInfo
 import message_filters
-from uwds3_msgs.msg import SceneNodeArrayStamped, SceneNode, Feature, PrimitiveShape
+from uwds3_msgs.msg import SceneNodeArrayStamped, SceneChangesStamped, SceneNode, Feature
 from cv_bridge import CvBridge
 from tf import transformations as tfm
 import tf2_ros
@@ -47,7 +47,6 @@ class HumanVisualModel(object):
         camera_info.K = list(camera_matrix.flatten())
         camera_info.P = list(P_matrix.flatten())
         return camera_info
-
 
 class Uwds3Perception(object):
     def __init__(self):
@@ -104,6 +103,8 @@ class Uwds3Perception(object):
 
         self.publish_tf = rospy.get_param("~publish_tf", True)
 
+        self.as_provider = rospy.get_param("~as_provider", True)
+
         self.use_retina_filter = rospy.get_param("~use_retina_filter", False)
         self.retina_filter_config_filename = rospy.get_param("~retina_filter_config_filename", "")
         if self.use_retina_filter is True:
@@ -115,10 +116,14 @@ class Uwds3Perception(object):
         self.n_init = rospy.get_param("~n_init", 6)
         self.min_iou_distance = rospy.get_param("~min_iou_distance", 0.8)
         self.max_disappeared = rospy.get_param("~max_disappeared", 30)
+        self.max_age = rospy.get_param("~max_age", 60)
 
         self.tracker = Tracker(iou_distance, n_init=self.n_init, min_distance=self.min_iou_distance, max_disappeared=7, max_age=15)
 
-        self.tracks_publisher = rospy.Publisher("tracks", SceneNodeArrayStamped, queue_size=1)
+        if self.as_provider is False:
+            self.tracks_publisher = rospy.Publisher("tracks", SceneNodeArrayStamped, queue_size=1)
+        else:
+            self.tracks_publisher = rospy.Publisher("tracks", SceneChangesStamped, queue_size=1)
 
         self.visualization_publisher = rospy.Publisher("tracks_image", Image, queue_size=1)
 
@@ -145,6 +150,12 @@ class Uwds3Perception(object):
         self.camera_frame_id = msg.header.frame_id
         self.camera_matrix = np.array(msg.K).reshape((3, 3))
         self.dist_coeffs = np.array(msg.D)
+
+    def extract_features(self, tracks):
+        pass
+
+    def estimate_depth(self, tracks):
+        pass
 
     def observation_callback(self, bgr_image_msg, depth_image_msg=None):
         if self.camera_info is not None:
@@ -189,13 +200,17 @@ class Uwds3Perception(object):
             tracking_fps_str = "Tracking and pose estimation fps : {:0.4f}hz".format(tracking_fps)
             perception_fps_str = "Perception fps : {:0.4f}hz".format(perception_fps)
 
-            cv2.putText(viz_frame, "Nb detections/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            cv2.putText(viz_frame, detection_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            cv2.putText(viz_frame, tracking_fps_str, (5, 65),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            cv2.putText(viz_frame, perception_fps_str, (5, 85),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.putText(viz_frame, "Nb detections/tracks : {}/{}".format(len(detections), len(tracks)), (5, 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            cv2.putText(viz_frame, detection_fps_str, (5, 45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            cv2.putText(viz_frame, tracking_fps_str, (5, 65),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            cv2.putText(viz_frame, perception_fps_str, (5, 85),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
-            entity_array = SceneNodeArrayStamped()
-            entity_array.header = bgr_image_msg.header
+            if self.as_provider is not False:
+                scene_changes = SceneChangesStamped()
+                scene_changes.header = bgr_image_msg.header
+            else:
+                entity_array = SceneNodeArrayStamped()
+                entity_array.header = bgr_image_msg.header
 
             for track in tracks:
                 self.draw_track(viz_frame, track, self.camera_matrix, self.dist_coeffs)
@@ -232,21 +247,21 @@ class Uwds3Perception(object):
                         entity.id = track.class_label+"_"+track.uuid.replace("-", "")
                         if track.translation is not None and track.rotation is not None:
                             entity.is_located = True
-                            entity.position.header = bgr_image_msg.header
-                            entity.position.header.frame_id = self.global_frame_id
-                            entity.position.pose.pose.position.x = t_final[0]
-                            entity.position.pose.pose.position.y = t_final[1]
-                            entity.position.pose.pose.position.z = t_final[2]
+                            entity.position_with_cov.header = bgr_image_msg.header
+                            entity.position_with_cov.header.frame_id = self.global_frame_id
+                            entity.position_with_cov.pose.pose.position.x = t_final[0]
+                            entity.position_with_cov.pose.pose.position.y = t_final[1]
+                            entity.position_with_cov.pose.pose.position.z = t_final[2]
                             if track.class_label == "face":
-                                entity.position.pose.pose.orientation.x = q_final[0]
-                                entity.position.pose.pose.orientation.y = q_final[1]
-                                entity.position.pose.pose.orientation.z = q_final[2]
-                                entity.position.pose.pose.orientation.w = q_final[3]
+                                entity.position_with_cov.pose.pose.orientation.x = q_final[0]
+                                entity.position_with_cov.pose.pose.orientation.y = q_final[1]
+                                entity.position_with_cov.pose.pose.orientation.z = q_final[2]
+                                entity.position_with_cov.pose.pose.orientation.w = q_final[3]
                             else:
-                                entity.position.pose.pose.orientation.x = 0.0
-                                entity.position.pose.pose.orientation.y = 0.0
-                                entity.position.pose.pose.orientation.z = 0.0
-                                entity.position.pose.pose.orientation.w = 1.0
+                                entity.position_with_cov.pose.pose.orientation.x = 0.0
+                                entity.position_with_cov.pose.pose.orientation.y = 0.0
+                                entity.position_with_cov.pose.pose.orientation.z = 0.0
+                                entity.position_with_cov.pose.pose.orientation.w = 1.0
                         else:
                             entity.is_located = False
 
@@ -267,6 +282,8 @@ class Uwds3Perception(object):
 
                         if "facial_landmarks" in track.properties:
                             feature = []
+                            #TODO remove this for loop
+                            #track.properties["facial_landmarks"][0]
                             for (x, y) in track.properties["facial_landmarks"]:
                                 feature.append(float(x)/rgb_image.shape[0])
                                 feature.append(float(y)//rgb_image.shape[1])
@@ -278,10 +295,16 @@ class Uwds3Perception(object):
                             entity.camera.header.frame_id = track.class_label+"_"+track.uuid[:6]
                         entity.last_update = bgr_image_msg.header.stamp
                         entity.expiration_time = bgr_image_msg.header.stamp + rospy.Duration(3.0)
-                        entity_array.nodes.append(entity)
+                        if self.as_provider is not False:
+                            scene_changes.changes.nodes.append(entity)
+                        else:
+                            entity_array.nodes.append(entity)
 
             viz_img_msg = self.bridge.cv2_to_imgmsg(viz_frame)
-            self.tracks_publisher.publish(entity_array)
+            if self.as_provider is not False:
+                self.tracks_publisher.publish(scene_changes)
+            else:
+                self.tracks_publisher.publish(entity_array)
             self.visualization_publisher.publish(viz_img_msg)
 
     def get_transform_from_tf2(self, source_frame, target_frame, time=None):
@@ -305,19 +328,26 @@ class Uwds3Perception(object):
             return False, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
 
     def draw_track(self, rgb_image, track, camera_matrix, dist_coeffs):
-        if track.is_confirmed():
-            tl_corner = (int(track.bbox.left()), int(track.bbox.top()))
-            br_corner = (int(track.bbox.right()), int(track.bbox.bottom()))
-            if track.rotation is not None and track.translation is not None:
-                cv2.drawFrameAxes(rgb_image, camera_matrix, dist_coeffs, np.array(track.rotation).reshape((3,1)), np.array(track.translation).reshape(3,1), 0.03)
-            if track.class_label == "face":
-                if "facial_landmarks" in track.properties:
-                    for (x, y) in track.properties["facial_landmarks"]:
-                        cv2.circle(rgb_image, (x, y), 1, (0, 255, 0), -1)
-                else:
-                    cv2.circle(rgb_image, (track.bbox.center().x, track.bbox.center().y), 2, (0, 255, 0), -1)
-            else:
-                cv2.circle(rgb_image, (track.bbox.center().x, track.bbox.center().y), 2, (0, 255, 0), -1)
-            cv2.putText(rgb_image, track.uuid[:6], (tl_corner[0]+5, tl_corner[1]+25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (240, 0, 0), 2)
-            cv2.putText(rgb_image, track.class_label, (tl_corner[0]+5, tl_corner[1]+45),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (240, 0, 0), 2)
-            cv2.rectangle(rgb_image, tl_corner, br_corner, (255, 255, 0), 2)
+        tl_corner = (int(track.bbox.left()), int(track.bbox.top()))
+        br_corner = (int(track.bbox.right()), int(track.bbox.bottom()))
+        if track.rotation is not None and track.translation is not None:
+            cv2.drawFrameAxes(rgb_image, camera_matrix, dist_coeffs, np.array(track.rotation).reshape((3,1)), np.array(track.translation).reshape(3,1), 0.03)
+        if track.class_label == "face":
+            if "facial_landmarks" in track.properties:
+                previous_point = None
+                for pxd, (x, y) in enumerate(track.properties["facial_landmarks"]):
+                    if previous_point is not None:
+                        cv2.line(rgb_image, previous_point, (x, y), (0, 255, 255), thickness=1)
+                    if pxd == 16 or pxd == 21 or pxd == 26 or pxd == 30 or pxd == 35 or pxd == 41 or pxd == 47:
+                        previous_point = None
+                    else:
+                        previous_point = x, y
+
+        if track.is_confirmed() is True:
+            cv2.putText(rgb_image, track.uuid[:6], (tl_corner[0]+5, tl_corner[1]+25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
+            cv2.putText(rgb_image, track.class_label, (tl_corner[0]+5, tl_corner[1]+45), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 250, 250), 1)
+            cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 255, 0), 1)
+        elif track.is_occluded() is True:
+            cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 0, 250), 1)
+        else:
+            cv2.rectangle(rgb_image, tl_corner, br_corner, (200, 200, 0), 1)

@@ -9,7 +9,7 @@ class DeepFeaturesExtractor(object):
     """
     """
 
-    def __init__(self, model_type="MobileNet", weights="random", input_shape=(128,128, 3)):
+    def __init__(self, model_type="MobileNet", weights="imagenet", input_shape=(128,128, 3)):
         """
         """
         model_types = ["MobileNet", "MobileNetV2"]

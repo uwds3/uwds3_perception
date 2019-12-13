@@ -41,7 +41,7 @@ class Track(object):
 
         self.translation_cov = 0.98
 
-        self.rotation_cov = 0.1
+        self.rotation_cov = 0.25
 
         r_stabilizers = [Stabilizer(
                         state_num=2,
@@ -87,10 +87,18 @@ class Track(object):
         if self.first_kalman_update is True:
             self.first_kalman_update = False
             pose_np = np.array((rotation, translation)).flatten()
+            i = 0
             for value, ps_stb in zip(pose_np, self.stabilizers):
-                ps_stb.state[0] = value
-                ps_stb.state[1] = 0
-                stable_pose.append(value)
+                ps_stb.set_q_r(cov_process=0.1, cov_measure=0.001)
+                ps_stb.update([value])
+                ps_stb.update([value])
+                ps_stb.update([value])
+                if i >= 3:
+                    ps_stb.set_q_r(cov_process=0.1, cov_measure=self.translation_cov)
+                else:
+                    ps_stb.set_q_r(cov_process=0.1, cov_measure=self.rotation_cov)
+                stable_pose.append(ps_stb.state[0])
+                i += 1
         else:
             stable_pose = []
             pose_np = np.array((rotation, translation)).flatten()

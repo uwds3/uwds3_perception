@@ -3,7 +3,6 @@ import math
 import numpy as np
 from .facial_landmarks_estimator import RIGHT_EYE_CORNER, LEFT_EYE_CORNER, LEFT_MOUTH_CORNER, RIGHT_MOUTH_CORNER, CHIN, NOSE
 
-
 class HeadPoseEstimator(object):
     def __init__(self):
         self.model_3d = np.float32([[0.0, 0.0, 0.0], # nose
