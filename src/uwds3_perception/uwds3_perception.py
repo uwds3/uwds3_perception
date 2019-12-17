@@ -247,21 +247,21 @@ class Uwds3Perception(object):
                         entity.id = track.class_label+"_"+track.uuid.replace("-", "")
                         if track.translation is not None and track.rotation is not None:
                             entity.is_located = True
-                            entity.position_with_cov.header = bgr_image_msg.header
-                            entity.position_with_cov.header.frame_id = self.global_frame_id
-                            entity.position_with_cov.pose.pose.position.x = t_final[0]
-                            entity.position_with_cov.pose.pose.position.y = t_final[1]
-                            entity.position_with_cov.pose.pose.position.z = t_final[2]
+                            entity.pose_stamped.header = bgr_image_msg.header
+                            entity.pose_stamped.header.frame_id = self.global_frame_id
+                            entity.pose_stamped.pose.pose.position.x = t_final[0]
+                            entity.pose_stamped.pose.pose.position.y = t_final[1]
+                            entity.pose_stamped.pose.pose.position.z = t_final[2]
                             if track.class_label == "face":
-                                entity.position_with_cov.pose.pose.orientation.x = q_final[0]
-                                entity.position_with_cov.pose.pose.orientation.y = q_final[1]
-                                entity.position_with_cov.pose.pose.orientation.z = q_final[2]
-                                entity.position_with_cov.pose.pose.orientation.w = q_final[3]
+                                entity.pose_stamped.pose.pose.orientation.x = q_final[0]
+                                entity.pose_stamped.pose.pose.orientation.y = q_final[1]
+                                entity.pose_stamped.pose.pose.orientation.z = q_final[2]
+                                entity.pose_stamped.pose.pose.orientation.w = q_final[3]
                             else:
-                                entity.position_with_cov.pose.pose.orientation.x = 0.0
-                                entity.position_with_cov.pose.pose.orientation.y = 0.0
-                                entity.position_with_cov.pose.pose.orientation.z = 0.0
-                                entity.position_with_cov.pose.pose.orientation.w = 1.0
+                                entity.pose_stamped.pose.pose.orientation.x = 0.0
+                                entity.pose_stamped.pose.pose.orientation.y = 0.0
+                                entity.pose_stamped.pose.pose.orientation.z = 0.0
+                                entity.pose_stamped.pose.pose.orientation.w = 1.0
                         else:
                             entity.is_located = False
 
@@ -283,7 +283,6 @@ class Uwds3Perception(object):
                         if "facial_landmarks" in track.properties:
                             feature = []
                             #TODO remove this for loop
-                            #track.properties["facial_landmarks"][0]
                             for (x, y) in track.properties["facial_landmarks"]:
                                 feature.append(float(x)/rgb_image.shape[0])
                                 feature.append(float(y)//rgb_image.shape[1])
