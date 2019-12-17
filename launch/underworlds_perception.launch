@@ -7,7 +7,7 @@
   <arg name="depth_image_topic" default="xtion/depth/image_rect"/>
   <arg name="depth_camera_info_topic" default="xtion/depth/camera_info"/>
 
-  <arg name="global_frame_id" default="odom"/>
+  <arg name="global_frame_id" default="map"/>
 
   <!-- Detector model -->
   <arg name="detector_model_filename" default="$(find uwds3_perception)/models/detection/ssd_mobilenet_v2_coco_2018_03_29.pb"/>
@@ -28,8 +28,8 @@
 
   <!-- Mode parameters -->
   <arg name="publish_visualization_image" default="true"/>
-  <arg name="use_depth" default="true"/>
-  <arg name="use_faces" default="false"/>
+  <arg name="use_depth" default="false"/>
+  <arg name="use_faces" default="true"/>
 
   <!-- Tracker parameters -->
   <arg name="n_init" default="6"/>

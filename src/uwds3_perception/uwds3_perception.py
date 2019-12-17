@@ -16,7 +16,7 @@ from .estimation.shape_estimator import ShapeEstimator
 
 class HumanVisualModel(object):
     FOV = 60.0 # human field of view
-    WIDTH = 90 # image width resolution for rendering
+    WIDTH = 70 # image width resolution for rendering
     HEIGHT = 68  # image height resolution for rendering
     CLIPNEAR = 0.3 # clipnear
     CLIPFAR = 1e+3 # clipfar
@@ -346,7 +346,7 @@ class Uwds3Perception(object):
         if track.is_confirmed() is True:
             cv2.putText(rgb_image, track.uuid[:6], (tl_corner[0]+5, tl_corner[1]+25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
             cv2.putText(rgb_image, track.class_label, (tl_corner[0]+5, tl_corner[1]+45), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 250, 250), 1)
-            cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 255, 0), 1)
+            cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 255, 0), 2)
         elif track.is_occluded() is True:
             cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 0, 250), 1)
         else:

@@ -41,7 +41,7 @@ class Track(object):
 
         self.translation_cov = 0.98
 
-        self.rotation_cov = 0.25
+        self.rotation_cov = 0.98
 
         r_stabilizers = [Stabilizer(
                         state_num=2,
