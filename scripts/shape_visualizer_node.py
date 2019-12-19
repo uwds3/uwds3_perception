@@ -44,7 +44,7 @@ class ShapeVisualizerNode(object):
 
                 if track.shape.type == PrimitiveShape.CYLINDER:
                     marker.type = Marker.CYLINDER
-                elif track.shape.type == PrimitiveShape.BOX:
+                elif track.shape.type == PrimitiveShape.BBOX3D:
                     marker.type = Marker.CUBE
                 if track.label == "face":
                     marker.scale = Vector3(x=track.shape.dimensions[0],

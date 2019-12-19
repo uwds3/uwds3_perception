@@ -343,8 +343,8 @@ class Uwds3Perception(object):
                         previous_point = x, y
 
         if track.is_confirmed() is True:
-            cv2.putText(rgb_image, track.uuid[:6], (tl_corner[0]+5, tl_corner[1]+25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 250, 250), 1)
-            cv2.putText(rgb_image, track.class_label, (tl_corner[0]+5, tl_corner[1]+45), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 250, 250), 1)
+            cv2.putText(rgb_image, track.uuid[:6], (tl_corner[0]+5, tl_corner[1]+25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (250, 0, 250), 1)
+            cv2.putText(rgb_image, track.class_label, (tl_corner[0]+5, tl_corner[1]+45), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (250, 0, 250), 1)
             cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 255, 0), 2)
         elif track.is_occluded() is True:
             cv2.rectangle(rgb_image, tl_corner, br_corner, (0, 0, 250), 1)
