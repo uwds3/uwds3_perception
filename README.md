@@ -1,7 +1,7 @@
 # uwds3_perception
 A lightweight, fast and robust perception stack for HRI research
 
-This package is designed to be part of the Underwrolds stack but can be used alone.
+This package is designed to be part of the Underworlds stack but can be used alone.
 
 ## How to install
 
@@ -34,6 +34,7 @@ roslaunch uwds3_perception underworlds_perception.launch
 * `detector_weights_filename`: The dnn detector weights (default SSD/MobilenetV2 mscoco)
 
 ### Subscribers
+
 
 
 ### Publishers

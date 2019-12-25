@@ -4,6 +4,7 @@ import numpy as np
 from keras.preprocessing import image
 from keras.applications.mobilenet import MobileNet, preprocess_input
 from keras.applications.mobilenet_v2 import MobileNetV2
+from keras.applications.vgg16 import VGG16
 
 class DeepFeaturesExtractor(object):
     """
@@ -12,7 +13,7 @@ class DeepFeaturesExtractor(object):
     def __init__(self, model_type="MobileNet", weights="imagenet", input_shape=(128,128, 3)):
         """
         """
-        model_types = ["MobileNet", "MobileNetV2"]
+        model_types = ["MobileNet", "MobileNetV2", "VGG16"]
         weights_types = ["imagenet", "random"]
         if weights not in weights_types:
             raise ValueError("Invalid model type. Should be one of: {}".format(weights_types))
@@ -27,6 +28,8 @@ class DeepFeaturesExtractor(object):
             self.model = MobileNet(weights=weights, include_top=False, pooling='avg', input_shape=input_shape)
         if model_type == "MobileNetV2":
             self.model = MobileNetV2(weights=weights, include_top=False, pooling='avg', input_shape=input_shape)
+        if model_type == "VGG16":
+            self.model = VGG16(weights=weights, include_top=False, pooling='avg', input_shape=input_shape)
 
     def extract(self, frame, detection=None):
         """

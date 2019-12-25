@@ -21,3 +21,5 @@ cd -
 mkdir models/features
 cd models/features
 wget https://storage.cmusatyalab.org/openface-models/nn4.small2.v1.t7
+
+wget https://download.01.org/opencv/2019/open_model_zoo/R1/models_bin/person-reidentification-retail-0076/person-reidentification-retail-0076.prototxt
