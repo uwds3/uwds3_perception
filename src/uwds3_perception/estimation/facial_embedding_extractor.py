@@ -1,0 +1,4 @@
+
+
+class FacialEmbeddingExtractor(object):
+    pass

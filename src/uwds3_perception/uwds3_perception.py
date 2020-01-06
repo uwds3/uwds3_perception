@@ -1,5 +1,6 @@
 import cv2
 import rospy
+import math
 import numpy as np
 import geometry_msgs
 from sensor_msgs.msg import Image, CameraInfo
@@ -13,6 +14,8 @@ from .detection.opencv_dnn_detector import OpenCVDNNDetector
 from .tracking.tracker import Tracker
 from .tracking.linear_assignment import iou_distance
 from .estimation.shape_estimator import ShapeEstimator
+from .estimation.head_pose_estimator import HeadPoseEstimator
+from .estimation.facial_landmarks_estimator import FacialLandmarksEstimator
 
 class HumanVisualModel(object):
     FOV = 60.0 # human field of view
@@ -93,6 +96,10 @@ class Uwds3Perception(object):
                                                    self.face_detector_weights_filename,
                                                    self.face_detector_config_filename,
                                                    300)
+            shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
+            self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
+            self.head_pose_estimator = HeadPoseEstimator()
+            self.face_of_interest_uuid = None
 
         self.n_frame = rospy.get_param("~n_frame", 2)
         self.frame_count = 0
@@ -168,7 +175,13 @@ class Uwds3Perception(object):
                 depth_image = None
             viz_frame = bgr_image
 
+            _, image_height, image_width = bgr_image.shape
+
+            ######################################################
+            # Detection
+            ######################################################
             detection_timer = cv2.getTickCount()
+
             detections = []
             if self.use_faces is True:
                 if self.frame_count % self.n_frame == 0:
@@ -185,14 +198,91 @@ class Uwds3Perception(object):
                 else:
                     detections = []
             self.frame_count += 1
+
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
+            ######################################################
+            # Tracking
+            ######################################################
             tracking_timer = cv2.getTickCount()
+
             if self.only_human is False:
                 tracks = self.tracker.update(rgb_image, detections, self.camera_matrix, self.dist_coeffs)
             else:
                 detections = [d for d in detections if d.class_label in self.body_parts]
             tracks = self.tracker.update(rgb_image, detections, self.camera_matrix, self.dist_coeffs, depth_image=depth_image)
+
+            tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
+
+            ######################################################
+            # Head pose estimation
+            ######################################################
+            head_pose_timer = cv2.getTickCount()
+
+            face_tracks = [t for t in tracks if t.class_label=="face" and t.is_confirmed()]
+
+            face_of_interest = None
+            face_of_interest_uuid = None
+
+            cx = image_width/2
+            cy = image_height/2
+            min_dist = 10000
+
+            for face in face_tracks:
+                if self.face_of_interest_uuid is not None:
+                    if self.face_of_interest_uuid != face.uuid:
+                        if "facial_landmarks" in face.properties:
+                            del face.properties["facial_landmarks"]
+                            face.translation = None
+                            face.rotation = None
+                face_x = face.bbox.center().x
+                face_y = face.bbox.center().y
+                distance_from_center = math.sqrt(pow(cx-face_x, 2)+pow(cy-face_y, 2))
+                if min_dist > distance_from_center:
+                    face_of_interest_uuid = face.uuid
+                    face_of_interest = face
+                    min_dist = distance_from_center
+
+            if face_of_interest is not None:
+                shape = self.facial_landmarks_estimator.estimate(rgb_image, face)
+
+                if face_of_interest.rotation is None or face_of_interest.translation is None:
+                    success, rot, trans = self.head_pose_estimator.estimate(shape, self.camera_matrix, self.dist_coeffs)
+                else:
+                    success, rot, trans = self.head_pose_estimator.estimate(shape, self.camera_matrix, self.dist_coeffs, previous_head_pose=(face_of_interest.rotation, face_of_interest.translation))
+                if success is True:
+                    if depth_image is not None:
+                        success, trans_depth = self.translation_estimator.estimate(face.bbox, depth_image, self.camera_matrix, self.dist_coeffs)
+                        if success:
+                            face_of_interest.filter(rot.reshape((3,)), trans_depth.reshape((3,)))
+                        else:
+                            face_of_interest.filter(rot.reshape((3,)), trans.reshape((3,)))
+                    else:
+                        face_of_interest.filter(rot.reshape((3,)), trans.reshape((3,)))
+                    face_of_interest.properties["facial_landmarks"] = shape
+
+            self.face_of_interest_uuid = face_of_interest_uuid
+
+            head_pose_fps = cv2.getTickFrequency() / (cv2.getTickCount() - head_pose_timer)
+
+            ######################################################
+            # Depth & Shape estimation
+            ######################################################
+            depth_shape_timer = cv2.getTickCount()
+
+            if depth_image_msg is not None:
+                for track in tracks:
+                    if track.translation is None and track.rotation is None:
+                        success, trans = self.translation_estimator.estimate(track.bbox, depth_image, self.camera_matrix, self.dist_coeffs)
+                        if success is True:
+                            rot = np.array([math.pi/2, 0.0, 0.0])
+                            track.filter(rot, trans)
+
+            depth_shape_fps = cv2.getTickFrequency() / (cv2.getTickCount() - depth_shape_timer)
+
+            ######################################################
+            # Visualization of debug image and tf publication
+            ######################################################
 
             tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
             perception_fps = cv2.getTickFrequency() / (cv2.getTickCount() - perception_timer)
@@ -282,10 +372,7 @@ class Uwds3Perception(object):
 
                         if "facial_landmarks" in track.properties:
                             feature = []
-                            #TODO remove this for loop
-                            for (x, y) in track.properties["facial_landmarks"]:
-                                feature.append(float(x)/rgb_image.shape[0])
-                                feature.append(float(y)//rgb_image.shape[1])
+                            feature = np.array(track.properties["facial_landmarks"]).flatten()
                             entity.features.append(Feature(name="facial_landmarks", data=feature))
 
                         if entity.label == "face":
