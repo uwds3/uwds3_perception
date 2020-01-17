@@ -1,25 +1,22 @@
 import cv2
 import numpy as np
+from uwds3_perception.types.features import Features
 
-class HistogramFeaturesExtractor(object):
-    def __init__(self):
-        pass
 
-    def extract(self, frame, detection=None):
-        """ Extract hue channel histogram as a features vector """
-        if detection is not None:
-            x = detection[0]
-            y = detection[1]
-            w = detection[2]
-            h = detection[3]
-            crop_frame = frame[y:y+h, x:x+w]
-        else:
-            crop_frame = frame
-        try:
-            frame_resized = cv2.resize(crop_frame, (128, 128))
-        except:
-            print detection
-        hsv = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2HSV)
-        hist = cv2.calcHist([hsv], [0], None, [180], [0, 180])
-        hist = hist / np.max(hist)
-        return hist[:, 0]
+class ColorFeaturesExtractor(object):
+    """Represents a color features extractor"""
+
+    def extract(self, rgb_image, detections=None):
+        """Extracts hue channel histogram as a features vector"""
+        for det in detections:
+            x = int(det.bbox.center().x)
+            y = int(det.bbox.center().y)
+            w = int(det.bbox.width())
+            h = int(det.bbox.height())
+            cropped_image = rgb_image[y:y+h, x:x+w]
+            hsv = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2HSV)
+            hist = cv2.calcHist([hsv], [0], None, [180], [0, 180])
+            hist = hist / np.max(hist)
+            det.features["color"] = Features("color",
+                                             hist[:, 0],
+                                             h/float(rgb_image.shape[0]))

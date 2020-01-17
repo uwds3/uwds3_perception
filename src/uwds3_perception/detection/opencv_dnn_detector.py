@@ -1,19 +1,19 @@
 import numpy as np
 import cv2
-import dlib
 import yaml
-from detection import Detection
+from uwds3_perception.types.detection import Detection
 
 class OpenCVDNNDetector(object):
     """  """
 
-    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.8, detector_confidence=1.0, swapRB=False):
+    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.85, swapRB=False):
         """  """
         with open(config_file_path, "r") as f:
             self.config = yaml.load(f)
         self.model = cv2.dnn.readNetFromTensorflow(model, weights)
+        # self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        # self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
         self.input_size = input_size
-        self.detector_confidence = detector_confidence
         self.max_overlap_ratio = max_overlap_ratio
         self.swapRB = swapRB
 
@@ -43,7 +43,7 @@ class OpenCVDNNDetector(object):
                 if self.config[class_id]["activated"] is True:
                     if confidence > self.config[class_id]["confidence_threshold"]:
 
-                        class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.6 else "unknown"
+                        class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.6 else "thing"
                         x_top_left = int(detections[0, 0, i, 3] * cols)
                         y_top_left = int(detections[0, 0, i, 4] * rows)
                         x_right_bottom = int(detections[0, 0, i, 5] * cols)
@@ -58,8 +58,9 @@ class OpenCVDNNDetector(object):
                         y_top_left = 0 if y_top_left < 0 else y_top_left
                         x_right_bottom = frame.shape[1]-1 if x_right_bottom > frame.shape[1]-1 else x_right_bottom
                         y_right_bottom = frame.shape[0]-1 if y_right_bottom > frame.shape[0]-1 else y_right_bottom
-
-                        bbox = [x_top_left, y_top_left, x_right_bottom, y_right_bottom, confidence*self.detector_confidence]
+                        if x_right_bottom - x_top_left <= 20 or y_right_bottom - y_top_left <= 20:
+                            continue
+                        bbox = [x_top_left, y_top_left, x_right_bottom, y_right_bottom, confidence]
                         if class_label not in detection_per_class:
                             detection_per_class[class_label] = []
                         if class_label not in score_per_class:
@@ -69,7 +70,7 @@ class OpenCVDNNDetector(object):
         for class_label, dets in detection_per_class.items():
             filtered_dets = self.non_max_suppression(np.array(dets), self.max_overlap_ratio)
             for d in filtered_dets:
-                filtered_detections.append(Detection(d[0], d[1], d[2], d[3], d[4]*self.detector_confidence, class_label))
+                filtered_detections.append(Detection(d[0], d[1], d[2], d[3], class_label, d[4]))
 
         return filtered_detections
 

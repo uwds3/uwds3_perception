@@ -26,16 +26,21 @@
   <!-- Head pose estimation parameters -->
   <arg name="shape_predictor_config_filename" default="$(find uwds3_perception)/models/estimation/shape_predictor_68_face_landmarks.dat"/>
 
+  <!-- Face embedding parameters -->
+  <arg name="facial_features_model_filename" default="$(find uwds3_perception)/models/features/nn4.small2.v1.t7"/>
+
   <!-- Tracker parameters -->
   <arg name="n_init" default="6"/>
-  <arg name="min_iou_distance" default="0.85"/>
-  <arg name="max_disappeared" default="30"/>
-  <arg name="max_age" default="60"/>
+  <arg name="min_iou_distance" default="1.0"/>
+  <arg name="min_color_distance" default="0.65"/>
+  <arg name="min_face_distance" default="0.65"/>
+  <arg name="max_disappeared" default="5"/>
+  <arg name="max_age" default="30"/>
 
   <!-- Other parameters -->
   <arg name="publish_visualization_image" default="true"/>
   <arg name="publish_tf" default="true"/>
-  <arg name="only_human" default="false"/>
+  <arg name="only_human" default="true"/>
   <arg name="use_depth" default="false"/>
   <arg name="use_faces" default="true"/>
   <arg name="n_frame" default="2"/>
@@ -63,12 +68,17 @@
 
       shape_predictor_config_filename: $(arg shape_predictor_config_filename)
 
+      facial_features_model_filename: $(arg facial_features_model_filename)
+
       publish_visualization_image: $(arg publish_visualization_image)
+
       use_depth: $(arg use_depth)
       use_faces: $(arg use_faces)
 
       n_init: $(arg n_init)
       min_iou_distance: $(arg min_iou_distance)
+      min_color_distance: $(arg min_color_distance)
+      min_face_distance: $(arg min_face_distance)
       max_disappeared: $(arg max_disappeared)
       max_age: $(arg max_age)
     </rosparam>

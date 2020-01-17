@@ -1,6 +1,7 @@
+import cv2
 import numpy as np
 import dlib
-import cv2
+from uwds3_perception.types.landmarks import FacialLandmarks
 
 POINT_OF_SIGHT = 27
 RIGHT_EYE_CORNER = 36
@@ -18,13 +19,16 @@ CHIN = 8
 
 class FacialLandmarksEstimator(object):
     def __init__(self, shape_predictor_config_file):
+        """ """
         self.predictor = dlib.shape_predictor(shape_predictor_config_file)
 
     def estimate(self, rgb_image, face_track):
+        """ """
+        image_height, image_width, _ = rgb_image.shape
         bbox = face_track.bbox
         gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-        shape = self.predictor(gray, dlib.rectangle(int(bbox.left()), int(bbox.top()), int(bbox.right()), int(bbox.bottom())))
-        coords = np.zeros((68, 2), dtype=int)
+        shape = self.predictor(gray, dlib.rectangle(int(bbox.xmin), int(bbox.ymin), int(bbox.xmax), int(bbox.ymax)))
+        coords = np.zeros((68, 2), dtype=np.float32)
         for i in range(0, 68):
-            coords[i] = (int(shape.part(i).x), int(shape.part(i).y))
-        return coords
+            coords[i] = (shape.part(i).x/float(image_width), shape.part(i).y/float(image_height))
+        return FacialLandmarks(coords, image_width, image_height)

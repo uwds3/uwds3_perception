@@ -6,7 +6,8 @@ from keras.applications.mobilenet_v2 import MobileNetV2
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
 
-class DeepFeaturesExtractor(object):
+
+class AppearanceFeaturesExtractor(object):
     """
     """
 
@@ -33,23 +34,20 @@ class DeepFeaturesExtractor(object):
         if model_type == "ResNet50":
             self.model = ResNet50(weights=weights, include_top=False, pooling='avg', input_shape=input_shape)
 
-    def extract(self, frame, detection=None):
+    def extract(self, rgb_image, track=None):
         """
         """
-        if detection is not None:
-            x = detection[0]
-            y = detection[1]
-            w = detection[2]
-            h = detection[3]
-            crop_frame = frame[y:y+h, x:x+w]
+        if track is not None:
+            x = track.bbox.center().x
+            y = track.bbox.center().y
+            w = track.bbox.width()
+            h = track.bbox.height()
+            crop_image = rgb_image[y:y+h, x:x+w]
         else:
-            crop_frame = frame
-        frame_resized = cv2.resize(crop_frame, (self.input_shape[0], self.input_shape[1]))
-        temp = frame_resized[0]
-        frame_resized[0] = frame_resized[3]
-        frame_resized[3] = temp
-        x = image.img_to_array(frame_resized)
+            crop_image = rgb_image
+        image_resized = cv2.resize(crop_image, (self.input_shape[0], self.input_shape[1]))
+        x = image.img_to_array(image_resized)
         x = np.expand_dims(x, axis=0)
         x = preprocess_input(x)
-        features = self.model.predict(x)[0]
-        return features
+        features = self.model.predict(x)
+        return np.array(features).flatten()

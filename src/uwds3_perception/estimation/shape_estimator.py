@@ -3,6 +3,7 @@ from uwds3_msgs.msg import PrimitiveShape
 
 
 class ShapeEstimator(object):
+    """ Estimate the 3D shape of a 2D track"""
     def __init__(self):
         self.shape_types = ["cylinder"]
 
