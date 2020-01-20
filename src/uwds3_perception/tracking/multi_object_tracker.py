@@ -53,7 +53,7 @@ class MultiObjectTracker(object):
         self.geometric_assignment = LinearAssignment(geometric_metric, min_distance=min_distance_geom)
         self.features_assignment = LinearAssignment(features_metric, min_distance=min_distance_feat)
 
-    def update(self, rgb_image, detections):
+    def update(self, rgb_image, detections, view, camera_matrix, dist_coeffs):
         """Updates the tracker"""
         # First we try to assign the detections to the tracks by using a geometric assignment (centroid or iou)
         first_matches, unmatched_detections, unmatched_tracks = self.geometric_assignment.match(self.tracks, detections)
@@ -71,9 +71,13 @@ class MultiObjectTracker(object):
             remaining_detections = unmatched_detections
 
         for detection_indice, track_indice in matches:
-            self.tracks[track_indice].update(detections[detection_indice])
+            self.tracks[track_indice].update(detections[detection_indice],
+                                             view,
+                                             camera_matrix,
+                                             dist_coeffs)
             if self.tracker_type is not None:
-                self.tracks[track_indice].tracker.update(rgb_image, self.tracks[track_indice].bbox)
+                self.tracks[track_indice].tracker.update(rgb_image,
+                                                         self.tracks[track_indice].bbox)
 
         for track_indice in remaining_tracks:
             if self.tracks[track_indice].is_confirmed():

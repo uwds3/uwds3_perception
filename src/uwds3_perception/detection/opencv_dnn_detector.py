@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import math
 import yaml
 from uwds3_perception.types.detection import Detection
 
@@ -17,10 +18,10 @@ class OpenCVDNNDetector(object):
         self.max_overlap_ratio = max_overlap_ratio
         self.swapRB = swapRB
 
-    def detect(self, frame):
+    def detect(self, rgb_image, depth_image=None):
         """
         """
-        frame_resized = cv2.resize(frame, (self.input_size, self.input_size))
+        frame_resized = cv2.resize(rgb_image, (self.input_size, self.input_size))
 
         self.model.setInput(cv2.dnn.blobFromImage(frame_resized, swapRB=self.swapRB))
 
@@ -33,8 +34,8 @@ class OpenCVDNNDetector(object):
         rows = frame_resized.shape[0]
         cols = frame_resized.shape[1]
 
-        height_factor = frame.shape[0]/float(self.input_size)
-        width_factor = frame.shape[1]/float(self.input_size)
+        height_factor = rgb_image.shape[0]/float(self.input_size)
+        width_factor = rgb_image.shape[1]/float(self.input_size)
 
         for i in range(detections.shape[2]):
             class_id = int(detections[0, 0, i, 1])
@@ -44,23 +45,23 @@ class OpenCVDNNDetector(object):
                     if confidence > self.config[class_id]["confidence_threshold"]:
 
                         class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.6 else "thing"
-                        x_top_left = int(detections[0, 0, i, 3] * cols)
-                        y_top_left = int(detections[0, 0, i, 4] * rows)
-                        x_right_bottom = int(detections[0, 0, i, 5] * cols)
-                        y_right_bottom = int(detections[0, 0, i, 6] * rows)
+                        xmin = int(detections[0, 0, i, 3] * cols)
+                        ymin = int(detections[0, 0, i, 4] * rows)
+                        xmax = int(detections[0, 0, i, 5] * cols)
+                        ymax = int(detections[0, 0, i, 6] * rows)
 
-                        x_top_left = int(width_factor * x_top_left)
-                        y_top_left = int(height_factor * y_top_left)
-                        x_right_bottom = int(width_factor * x_right_bottom)
-                        y_right_bottom = int(height_factor * y_right_bottom)
+                        xmin = int(width_factor * xmin)
+                        ymin = int(height_factor * ymin)
+                        xmax = int(width_factor * xmax)
+                        ymax = int(height_factor * ymax)
 
-                        x_top_left = 0 if x_top_left < 0 else x_top_left
-                        y_top_left = 0 if y_top_left < 0 else y_top_left
-                        x_right_bottom = frame.shape[1]-1 if x_right_bottom > frame.shape[1]-1 else x_right_bottom
-                        y_right_bottom = frame.shape[0]-1 if y_right_bottom > frame.shape[0]-1 else y_right_bottom
-                        if x_right_bottom - x_top_left <= 20 or y_right_bottom - y_top_left <= 20:
+                        xmin = 0 if xmin < 0 else xmin
+                        ymin = 0 if ymin < 0 else ymin
+                        xmax = rgb_image.shape[1]-1 if xmax > rgb_image.shape[1]-1 else xmax
+                        ymax = rgb_image.shape[0]-1 if ymax > rgb_image.shape[0]-1 else ymax
+                        if xmax - xmin <= 20 or ymax - ymin <= 20:
                             continue
-                        bbox = [x_top_left, y_top_left, x_right_bottom, y_right_bottom, confidence]
+                        bbox = [xmin, ymin, xmax, ymax, confidence]
                         if class_label not in detection_per_class:
                             detection_per_class[class_label] = []
                         if class_label not in score_per_class:
@@ -70,7 +71,17 @@ class OpenCVDNNDetector(object):
         for class_label, dets in detection_per_class.items():
             filtered_dets = self.non_max_suppression(np.array(dets), self.max_overlap_ratio)
             for d in filtered_dets:
-                filtered_detections.append(Detection(d[0], d[1], d[2], d[3], class_label, d[4]))
+                if depth_image is not None:
+                    x = d[2] - d[0]
+                    y = d[3] - d[1]
+                    x = depth_image.shape[1]-1 if x > depth_image.shape[1] else x
+                    y = depth_image.shape[0]-1 if y > depth_image.shape[0] else y
+                    depth = depth_image[y][x]
+                    if math.isnan(depth):
+                        depth = None
+                else:
+                    depth = None
+                filtered_detections.append(Detection(d[0], d[1], d[2], d[3], class_label, d[4], depth=depth))
 
         return filtered_detections
 

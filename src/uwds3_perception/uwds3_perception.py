@@ -171,6 +171,7 @@ class Uwds3Perception(object):
 
             _, image_height, image_width = bgr_image.shape
 
+            view = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
             ######################################################
             # Detection
             ######################################################
@@ -211,15 +212,15 @@ class Uwds3Perception(object):
             tracking_timer = cv2.getTickCount()
 
             if self.frame_count % self.n_frame == 1:
-                face_tracks = self.face_tracker.update(rgb_image, detections)
-                object_tracks = self.object_tracker.update(rgb_image, [])
-                person_tracks = self.person_tracker.update(rgb_image, [])
+                face_tracks = self.face_tracker.update(rgb_image, detections, view, self.camera_matrix, self.dist_coeffs)
+                object_tracks = self.object_tracker.update(rgb_image, [], view, self.camera_matrix, self.dist_coeffs)
+                person_tracks = self.person_tracker.update(rgb_image, [], view, self.camera_matrix, self.dist_coeffs)
             else:
                 object_detections = [d for d in detections if d.label != "person"]
                 person_detections = [d for d in detections if d.label == "person"]
-                face_tracks = self.face_tracker.update(rgb_image, [])
-                object_tracks = self.object_tracker.update(rgb_image, object_detections)
-                person_tracks = self.person_tracker.update(rgb_image, person_detections)
+                face_tracks = self.face_tracker.update(rgb_image, [], view, self.camera_matrix, self.dist_coeffs)
+                object_tracks = self.object_tracker.update(rgb_image, object_detections, view, self.camera_matrix, self.dist_coeffs)
+                person_tracks = self.person_tracker.update(rgb_image, person_detections, view, self.camera_matrix, self.dist_coeffs)
             tracks = face_tracks + object_tracks + person_tracks
 
             tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
@@ -353,7 +354,7 @@ class Uwds3Perception(object):
 
             self.frame_count += 1
 
-    def get_transform_from_tf2(self, source_frame, target_frame, time=None):
+    def get_pose_from_tf2(self, source_frame, target_frame, time=None):
         try:
             if time is not None:
                 trans = self.tf_buffer.lookup_transform(source_frame, target_frame, time)
@@ -368,7 +369,7 @@ class Uwds3Perception(object):
             rz = trans.transform.rotation.z
             rw = trans.transform.rotation.w
 
-            return True, [x, y, z], [rx, ry, rz, rw]
+            return True, Vector6D(x=0.0, y=0.0, z=0.0).from_quaternion(rx, ry, rz, rw)
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn("[perception] Exception occured: {}".format(e))
-            return False, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
+            return False, Vector6D(x=0.0, y=0.0, z=0.0).from_quaternion(0.0, 0.0, 0.0, 1.0)

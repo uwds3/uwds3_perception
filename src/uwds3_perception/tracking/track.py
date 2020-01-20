@@ -66,13 +66,24 @@ class Track(object):
         if tracker_type is not None:
             self.tracker = SingleObjectTracker(tracker_type)
 
-    def update(self, detection):
+    def update(self, detection, view, camera_matrix, dist_coeffs):
         """Updates the track's bbox"""
         self.bbox.update(detection.bbox.xmin,
                          detection.bbox.ymin,
                          detection.bbox.xmax,
                          detection.bbox.ymax)
         self.features = detection.features
+        if detection.bbox.depth is not None:
+            cx = camera_matrix[0][2]
+            cy = camera_matrix[1][2]
+            fx = camera_matrix[0][0]
+            fy = camera_matrix[1][1]
+            x = (detection.bbox.center().x - cx) * detection.bbox.depth / fx
+            y = (detection.bbox.center().y - cy) * detection.bbox.depth / fy
+            z = detection.bbox.depth
+            position = Vector6D(x=x, y=y, z=z)
+            pose_in_map = view + position
+            self.update_pose(pose_in_map.position)
         self.age = 0
         self.hits += 1
         if self.state == TrackState.TENTATIVE and self.hits >= self.n_init:
@@ -82,14 +93,21 @@ class Track(object):
 
     def update_pose(self, position, rotation=None):
         if self.pose is None:
-            self.pose = Vector6DStabilized()
-            self.pose.position.from_array(position)
             if rotation is not None:
-                self.pose.rotation.from_array(rotation)
+                self.pose = Vector6DStabilized(x=position.x,
+                                               y=position.y,
+                                               z=position.z)
+            else:
+                self.pose = Vector6DStabilized(x=position.x,
+                                               y=position.y,
+                                               z=position.z,
+                                               rx=rotation.x,
+                                               ry=rotation.y,
+                                               rz=rotation.z)
         else:
-            self.pose.position.update(position)
+            self.pose.position.update(position.x, position.y, position.z)
             if rotation is not None:
-                self.pose.rotation.update(rotation)
+                self.pose.rotation.update(rotation.x, rotation.y, rotation.z)
 
     def predict_bbox(self):
         """Predict the bbox location based on motion model (kalman tracker)"""

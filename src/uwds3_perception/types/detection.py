@@ -6,11 +6,11 @@ from .bbox import BoundingBox
 class Detection(object):
     """Represents a 2D detection associated with a label and a confidence"""
 
-    def __init__(self, xmin, ymin, xmax, ymax, label, confidence):
+    def __init__(self, xmin, ymin, xmax, ymax, label, confidence, depth=None):
         """Detection constructor"""
         self.label = label
         self.confidence = confidence
-        self.bbox = BoundingBox(xmin, ymin, xmax, ymax)
+        self.bbox = BoundingBox(xmin, ymin, xmax, ymax, depth=None)
         self.features = {}
 
     def draw(self, image, color, thickness):

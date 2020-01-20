@@ -30,6 +30,14 @@ def initialize_bias(shape, name=None):
 
 
 class OneShotCNNLearner(object):
+    def __init__(self, input_shape, weights_path=None):
+        self.training_model = self.create_training_model(input_shape)
+        self.training_model.compile(loss="binary_crossentropy", optimizer=Adam(lr = 0.00006))
+        if weights_path is not None:
+            self.training_model.load_weights(weights_path)
+            self.embedding_model = self.create_embedding_model(input_shape, self.training_model)
+            self.embedding_model.compile(loss="binary_crossentropy", optimizer=Adam(lr = 0.00006))
+
     def create_training_model(self, input_shape):
         input_1 = Input(input_shape)
         input_2 = Input(input_shape)
@@ -85,8 +93,49 @@ class OneShotCNNLearner(object):
         siamese_model = Model(inputs=[input_1, input_2], outputs=head_model)
         return siamese_model
 
-    def create_embedding_model(object, weights):
+    def create_embedding_model(object, input_shape, training_model):
+        base_model = Sequential()
+        base_model.add(Conv2D(64, (10, 10),
+                       activation='relu',
+                       input_shape=input_shape,
+                       weights=training_model.layers[0].get_weights()))
+
+        base_model.add(MaxPooling2D())
+        base_model.add(Conv2D(128,
+                       (7, 7),
+                       activation='relu',
+                       weights=training_model.layers[1].get_weights()))
+
+        base_model.add(MaxPooling2D())
+        base_model.add(Conv2D(128,
+                              (4, 4),
+                              activation='relu',
+                              weights=training_model.layers[2].get_weights()))
+
+        base_model.add(MaxPooling2D())
+        base_model.add(Conv2D(256,
+                              (4, 4),
+                              activation='relu',
+                              weights=training_model.layers[3].get_weights()))
+
+        base_model.add(Flatten())
+        base_model.add(Dense(4096,
+                             activation='sigmoid',
+                             weights=training_model.layers[4].get_weights()))
+        return base_model
+
+    def draw_weights(self, mode="train"):
         raise NotImplementedError()
+
+    def draw_activations(self, mode="train"):
+        raise NotImplementedError()
+
+    def extract(self, rgb_image):
+        return self.embedding_model.predict(rgb_image)
+
+    def predict(self, rgb_image_1, rgb_image_2):
+        return self.training_model.predict(rgb_image_1, rgb_image_2)
+
 
 class OneshotDataLoader(object):
     """
@@ -238,7 +287,7 @@ class OneshotDataLoader(object):
         """
         n_correct = 0
         if verbose:
-            print("Evaluating model on {} random {} way one-shot learning tasks ...".format(trials, N_way))
+            print("Evaluating model {} on {} random {} way one-shot learning tasks ...".format(trials, N_way))
         for i in range(trials):
             inputs, targets = self.make_oneshot_task(N_way, mode=mode)
             probs = model.predict(inputs)
@@ -275,7 +324,7 @@ class OneshotDataLoader(object):
             n_right += correct
         return 100.0 * n_right / trials
 
-    def train_and_evaluate(self, model_path="/tmp/", N_way=20, trials=250, epochs=20000, evaluate_every=200, batch_size=32):
+    def train_and_evaluate(self, model, weights_path="/tmp/", N_way=20, trials=250, epochs=20000, evaluate_every=200, batch_size=32):
         t_start = time.time()
         best = -1
         for i in tqdm(range(1, epochs+1)):
@@ -286,29 +335,29 @@ class OneshotDataLoader(object):
                 print("Time for {0} iterations: {1} mins".format(i, (time.time()-t_start)/60.0))
                 print("Train Loss: {0}".format(loss))
                 val_acc = self.test_oneshot(N_way, trials, mode="val", verbose=True)
-                model.save_weights(os.path.join(model_path, 'weights.{}.h5'.format(i)))
+                model.save_weights(os.path.join(weights_path, 'weights.{}.h5'.format(i)))
                 if val_acc >= best:
                     print("Current best: {0}, previous best: {1}".format(val_acc, best))
                     best = val_acc
                 print("Continue training...")
 
-    def evaluate(self, model, model_name, N_way=20, trials=50):
+    def evaluate(self, model, model_name, N_way=20, trials=50, verbose=True):
         ways = np.arange(1, N_way, 2)
         val_accs, train_accs, nn_accs = [], [], []
 
         for N in ways:
-            val_accs.append(self.test_oneshot(N, trials, mode="val", verbose=False))
-            train_accs.append(self.test_oneshot(N, trials, mode="train", verbose=False))
-            nn_accs.append(self.test_nn_accuracy(N, trials))
+            val_accs.append(self.test_oneshot(model, N, trials, mode="val", verbose=verbose))
+            train_accs.append(self.test_oneshot(model, N, trials, mode="train", verbose=verbose))
+            nn_accs.append(self.test_nn_accuracy(N, trials, verbose=verbose))
 
-        plt.plot(ways, val_accs, "m", label="Siamese(val set)")
-        plt.plot(ways, train_accs, "y", label="Siamese(train set)")
+        plt.plot(ways, val_accs, "m", label=model_name+"(val)")
+        plt.plot(ways, train_accs, "y", label=model_name+"(train)")
         plt.plot(ways, nn_accs, "b", label="Nearest neighbour")
         plt.plot(ways, 100.0/ways, "g", label="Random guessing")
         plt.xlabel("Number of possible classes in one-shot tasks")
         plt.ylabel("% Accuracy")
         plt.title("One-Shot Learning Performance")
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.legend(loc='center left')
         plt.show()
 
 
@@ -316,9 +365,7 @@ if __name__ == '__main__':
     train_dir = "../../../data/omniglot/omniglot/python/images_background/"
     val_dir = "../../../data/omniglot/omniglot/python/images_evaluation/"
     input_shape = (105, 105, 1)
-    model = OneShotCNNLearner(input_shape).create_training_model()
-
-    model.compile(loss="binary_crossentropy", optimizer=Adam(lr = 0.00006))
-    data_loader = OneshotDataLoader(train_dir, val_dir, model)
-    data_loader.train(batch_size=32, epochs=20000)
-    data_loader.evaluate()
+    model = OneShotCNNLearner(input_shape).training_model
+    data_loader = OneshotDataLoader(train_dir, val_dir)
+    data_loader.train(model, batch_size=32, epochs=1)
+    data_loader.evaluate(model, "OneShotCNNLearner")
