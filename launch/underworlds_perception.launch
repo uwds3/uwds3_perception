@@ -19,13 +19,6 @@
   <arg name="face_detector_weights_filename" default="$(find uwds3_perception)/models/detection/opencv_face_detector.pbtxt"/>
   <arg name="face_detector_config_filename" default="$(find uwds3_perception)/config/detection/face_config.yaml"/>
 
-  <!-- <arg name="mtcnn_p_model_caffe_filename" default="$(find uwds3_perception)/models/detection/mtcnn-p.caffemodel"/>
-  <arg name="mtcnn_r_model_caffe_filename" default="$(find uwds3_perception)/models/detection/mtcnn-r.caffemodel"/>
-  <arg name="mtcnn_o_model_caffe_filename" default="$(find uwds3_perception)/models/detection/mtcnn-o.caffemodel"/>
-  <arg name="mtcnn_p_model_prototxt_filename" default="$(find uwds3_perception)/models/detection/mtcnn-p.prototxt"/>
-  <arg name="mtcnn_r_model_prototxt_filename" default="$(find uwds3_perception)/models/detection/mtcnn-r.prototxt"/>
-  <arg name="mtcnn_o_model_prototxt_filename" default="$(find uwds3_perception)/models/detection/mtcnn-o.prototxt"/> -->
-
   <!-- Retina filter parameters -->
   <arg name="use_retina_filter" default="false"/>
   <arg name="retina_filter_config_filename" default="$(find uwds3_perception)/config/preprocessing/retina.xml"/>

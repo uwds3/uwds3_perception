@@ -29,13 +29,8 @@ def initialize_bias(shape, name=None):
     return K.variable(values, name=name)
 
 
-
 class OneShotCNNLearner(object):
-    def __init__(self, input_shape):
-        self.model = self.create_model(input_shape)
-        self.model.compile(loss="binary_crossentropy",optimizer=Adam(lr = 0.00006))
-
-    def create_model(self, input_shape):
+    def create_training_model(self, input_shape):
         input_1 = Input(input_shape)
         input_2 = Input(input_shape)
 
@@ -90,21 +85,22 @@ class OneShotCNNLearner(object):
         siamese_model = Model(inputs=[input_1, input_2], outputs=head_model)
         return siamese_model
 
-    def load(self, checkpoint_path):
-        """Load pretrained weights"""
-        self.model.load_weights(checkpoint_path)
-
+    def create_embedding_model(object, weights):
+        raise NotImplementedError()
 
 class OneshotDataLoader(object):
     """
     Manage the dataset and oneshot test procedures for the given siamese network and dataset
     See : https://towardsdatascience.com/one-shot-learning-with-siamese-networks-using-keras-17f34e75bb3d
     """
-    def __init__(self, train_directory_path, val_directory_path, model):
+    def __init__(self, train_directory_path, val_directory_path):
+        print("Start loading the dataset:\r\n'{}'\r\n'{}'".format(train_directory_path, val_directory_path))
         self.X_train, self.Y_train, self.train_classes = self.load_dataset(train_directory_path)
         self.X_val, self.Y_val, self.val_classes = self.load_dataset(val_directory_path)
-        self.model = model
-        self.model.summary()
+        print("Training categories ({} different):".format(len(self.train_classes.keys())))
+        print("{}\r\n".format(self.train_classes.keys()))
+        print("Validation categories ({} different from training):".format(len(self.val_classes.keys())))
+        print("{}\r\n".format(self.val_classes.keys()))
 
     def load_dataset(self, data_directory_path, n=0, verbose=True):
         """Load the dataset from given dir"""
@@ -112,9 +108,6 @@ class OneshotDataLoader(object):
         Y_data = []
         individual_dict = {}
         category_dict = {}
-        if verbose:
-            print("Start loading '{}' dataset...".format(data_directory_path))
-
         for c in os.listdir(data_directory_path):
             category_dict[c] = [n, 0]
             class_path = os.path.join(data_directory_path, c)
@@ -136,9 +129,6 @@ class OneshotDataLoader(object):
 
         Y_data = np.vstack(Y_data)
         X_data = np.stack(X_data)
-        if verbose:
-            print("Categories:")
-            print("{}\r\n".format(category_dict.keys()))
         return X_data, Y_data, category_dict
 
     def create_batch(self, batch_size, mode="train"):
@@ -175,31 +165,39 @@ class OneshotDataLoader(object):
 
         return pairs, targets
 
-    def generate(self, batch_size, mode="train"):
+    def get_training_generator(self, batch_size):
         """
         Generates batches, so model.fit_generator can be used.
         """
         while True:
-            pairs, targets = self.create_batch(batch_size, mode)
+            pairs, targets = self.create_batch(batch_size, mode="train")
             yield (pairs, targets)
 
-    def train(self, *args, **kwargs):
+    def get_validation_generator(self, batch_size):
+        """
+        Generates batches, so model.fit_generator can be used.
+        """
+        while True:
+            pairs, targets = self.create_batch(batch_size, mode="val")
+            yield (pairs, targets)
+
+    def train(self, model, *args, **kwargs):
         """
         Train the siamese network
         """
         print("Start training :")
         batch_size = kwargs.pop('batch_size')
 
-        train_generator = self.generate(batch_size, mode="train")
-        val_generator = self.generate(batch_size, mode="val")
+        train_generator = self.get_training_generator(batch_size)
+        val_generator = self.get_validation_generator(batch_size)
 
         train_steps = max(len(self.X_train) / batch_size, 1)
         val_steps = max(len(self.X_val) / batch_size, 1)
 
-        self.model.fit_generator(train_generator,
-                                 steps_per_epoch=train_steps,
-                                 validation_data=val_generator,
-                                 validation_steps=val_steps, **kwargs)
+        model.fit_generator(train_generator,
+                            steps_per_epoch=train_steps,
+                            validation_data=val_generator,
+                            validation_steps=val_steps, **kwargs)
 
     def make_oneshot_task(self, N_way, mode="val", category=None):
         """
@@ -234,7 +232,7 @@ class OneshotDataLoader(object):
         pairs = [test_image, support_set]
         return pairs, targets
 
-    def test_oneshot(self, N_way, trials, mode="val", verbose=True):
+    def test_oneshot(self, model, N_way, trials, mode="val", verbose=True):
         """
         Tests average N way oneshot learning accuracy of a siamese neural net over k one-shot tasks
         """
@@ -243,7 +241,7 @@ class OneshotDataLoader(object):
             print("Evaluating model on {} random {} way one-shot learning tasks ...".format(trials, N_way))
         for i in range(trials):
             inputs, targets = self.make_oneshot_task(N_way, mode=mode)
-            probs = self.model.predict(inputs)
+            probs = model.predict(inputs)
             if np.argmax(probs) == np.argmax(targets):
                 n_correct += 1
         percent_correct = (100.0 * n_correct / trials)
@@ -294,13 +292,13 @@ class OneshotDataLoader(object):
                     best = val_acc
                 print("Continue training...")
 
-    def evaluate(self, N_way=20, trials=50):
+    def evaluate(self, model, model_name, N_way=20, trials=50):
         ways = np.arange(1, N_way, 2)
         val_accs, train_accs, nn_accs = [], [], []
 
         for N in ways:
-            val_accs.append(self.test_oneshot(N, trials, mode="val", verbose=True))
-            train_accs.append(self.test_oneshot(N, trials, mode="train", verbose=True))
+            val_accs.append(self.test_oneshot(N, trials, mode="val", verbose=False))
+            train_accs.append(self.test_oneshot(N, trials, mode="train", verbose=False))
             nn_accs.append(self.test_nn_accuracy(N, trials))
 
         plt.plot(ways, val_accs, "m", label="Siamese(val set)")
@@ -318,7 +316,9 @@ if __name__ == '__main__':
     train_dir = "../../../data/omniglot/omniglot/python/images_background/"
     val_dir = "../../../data/omniglot/omniglot/python/images_evaluation/"
     input_shape = (105, 105, 1)
-    model = OneShotCNNLearner(input_shape).model
+    model = OneShotCNNLearner(input_shape).create_training_model()
+
+    model.compile(loss="binary_crossentropy", optimizer=Adam(lr = 0.00006))
     data_loader = OneshotDataLoader(train_dir, val_dir, model)
-    data_loader.train(batch_size=32)
+    data_loader.train(batch_size=32, epochs=20000)
     data_loader.evaluate()
