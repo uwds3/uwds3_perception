@@ -4,7 +4,7 @@ from .vector import Vector2D
 from .features import Features
 
 
-class FacialLandmarksIndex(object):
+class FacialLandmarks68Index(object):
     POINT_OF_SIGHT = 27
     RIGHT_EYE_CORNER = 36
     LEFT_EYE_CORNER = 45
@@ -18,23 +18,30 @@ class FacialLandmarksIndex(object):
     LEFT_EAR = 16
     CHIN = 8
 
+class FacialLandmarks5Index(object):
+    LEFT_EYE = 0
+    RIGHT_EYE = 1
+    NOSE = 4
+    RIGHT_MOUTH_CORNER = 2
+    LEFT_MOUTH_CORNER = 3
 
-class FacialLandmarks(object):
+
+class FacialLandmarks(Features):
     """Represents a 68 2D point facial landmarks"""
     def __init__(self, landmarks, image_width, image_height):
         """FacialLandmarks constructor"""
-        self.landmarks = landmarks
+        self.data = landmarks
         self.image_width = image_width
         self.image_height = image_height
 
     def get_point(self, index):
         """Returns the 2D point specified by the given index"""
-        return Vector2D(int(self.landmarks[index][0]*self.image_width),
-                        int(self.landmarks[index][1]*self.image_height))
+        return Vector2D(int(self.data[index][0]*self.image_width),
+                        int(self.data[index][1]*self.image_height))
 
     def features(self):
         """Returns the facial landmarks features"""
-        return Features("facial_landmarks", np.array(self.landmarks, np.float64), 0.80)
+        return Features("facial_landmarks", np.array(self.data, np.float64), 0.80)
 
     def draw(self, image, color, thickness):
         """Draws the facial landmarks"""
@@ -49,12 +56,12 @@ class FacialLandmarks(object):
                                 (point2.x, point2.y), color, thickness)
 
     def head_pose_points(self):
-        nose = self.get_point(FacialLandmarksIndex.NOSE).to_array()
-        chin = self.get_point(FacialLandmarksIndex.CHIN).to_array()
-        left_eye_corner = self.get_point(FacialLandmarksIndex.LEFT_EYE_CORNER).to_array()
-        right_eye_corner = self.get_point(FacialLandmarksIndex.RIGHT_EYE_CORNER).to_array()
-        left_mouth_corner = self.get_point(FacialLandmarksIndex.LEFT_MOUTH_CORNER).to_array()
-        right_mouth_corner = self.get_point(FacialLandmarksIndex.RIGHT_MOUTH_CORNER).to_array()
+        nose = self.get_point(FacialLandmarks68Index.NOSE).to_array()
+        chin = self.get_point(FacialLandmarks68Index.CHIN).to_array()
+        left_eye_corner = self.get_point(FacialLandmarks68Index.LEFT_EYE_CORNER).to_array()
+        right_eye_corner = self.get_point(FacialLandmarks68Index.RIGHT_EYE_CORNER).to_array()
+        left_mouth_corner = self.get_point(FacialLandmarks68Index.LEFT_MOUTH_CORNER).to_array()
+        right_mouth_corner = self.get_point(FacialLandmarks68Index.RIGHT_MOUTH_CORNER).to_array()
         return np.concatenate([nose,
                               chin,
                               left_eye_corner,
@@ -65,12 +72,12 @@ class FacialLandmarks(object):
     def to_msg(self):
         return Features("facial_landmarks", self.features, 1.0).to_msg()
 
-
-class BodyLandmarks(object):
-    def __init__(self, landmarks):
-        """BodyLandmarks constructor"""
-        self.landmarks = landmarks
-
-    def get_nose(self):
-        """Returns the nose 2D point"""
-        pass
+#
+# class BodyLandmarks(object):
+#     def __init__(self, landmarks):
+#         """BodyLandmarks constructor"""
+#         self.landmarks = landmarks
+#
+#     def get_nose(self):
+#         """Returns the nose 2D point"""
+#         pass

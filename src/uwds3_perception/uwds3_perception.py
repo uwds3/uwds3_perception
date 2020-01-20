@@ -41,28 +41,26 @@ class Uwds3Perception(object):
         self.camera_frame_id = None
         self.camera_info_subscriber = rospy.Subscriber(self.depth_camera_info_topic, CameraInfo, self.camera_info_callback)
 
-        self.detector_model_filename = rospy.get_param("~detector_model_filename", "")
-        self.detector_weights_filename = rospy.get_param("~detector_weights_filename", "")
-        self.detector_config_filename = rospy.get_param("~detector_config_filename", "")
+        detector_model_filename = rospy.get_param("~detector_model_filename", "")
+        detector_weights_filename = rospy.get_param("~detector_weights_filename", "")
+        detector_config_filename = rospy.get_param("~detector_config_filename", "")
 
-        self.face_detector_model_filename = rospy.get_param("~face_detector_model_filename", "")
-        self.face_detector_weights_filename = rospy.get_param("~face_detector_weights_filename", "")
-        self.face_detector_config_filename = rospy.get_param("~face_detector_config_filename", "")
-
-        self.body_parts = ["person", "face", "right_hand", "left_hand"]
+        face_detector_model_filename = rospy.get_param("~face_detector_model_filename", "")
+        face_detector_weights_filename = rospy.get_param("~face_detector_weights_filename", "")
+        face_detector_config_filename = rospy.get_param("~face_detector_config_filename", "")
 
         self.shape_estimator = ShapeEstimator()
 
-        self.detector = OpenCVDNNDetector(self.detector_model_filename,
-                                          self.detector_weights_filename,
-                                          self.detector_config_filename,
+        self.detector = OpenCVDNNDetector(detector_model_filename,
+                                          detector_weights_filename,
+                                          detector_config_filename,
                                           300)
 
         self.use_faces = rospy.get_param("~use_faces", True)
         if self.use_faces is True:
-            self.face_detector = OpenCVDNNDetector(self.face_detector_model_filename,
-                                                   self.face_detector_weights_filename,
-                                                   self.face_detector_config_filename,
+            self.face_detector = OpenCVDNNDetector(face_detector_model_filename,
+                                                   face_detector_weights_filename,
+                                                   face_detector_config_filename,
                                                    300)
             shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
             self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
