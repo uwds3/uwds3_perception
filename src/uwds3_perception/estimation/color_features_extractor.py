@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from uwds3_perception.types.features import Features
+from pyuwds3.types.features import Features
 
 
 class ColorFeaturesExtractor(object):

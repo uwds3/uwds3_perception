@@ -1,6 +1,6 @@
 import numpy as np
 import rospy
-from uwds3_perception.types.bbox import iou, overlap, centroid
+from pyuwds3.bbox_metrics import iou, overlap, centroid
 from .linear_assignment import LinearAssignment
 from scipy.spatial.distance import euclidean
 from .track import Track
@@ -22,7 +22,7 @@ def centroid_cost(detection, track):
 
 
 def color_cost(detection, track):
-    """Returns the centroid cost"""
+    """Returns the color cost"""
     return euclidean(detection.features["color"].data,
                      track.features["color"].data)
 
@@ -53,7 +53,7 @@ class MultiObjectTracker(object):
         self.geometric_assignment = LinearAssignment(geometric_metric, min_distance=min_distance_geom)
         self.features_assignment = LinearAssignment(features_metric, min_distance=min_distance_feat)
 
-    def update(self, rgb_image, detections, view, camera_matrix, dist_coeffs):
+    def update(self, rgb_image, detections):
         """Updates the tracker"""
         # First we try to assign the detections to the tracks by using a geometric assignment (centroid or iou)
         first_matches, unmatched_detections, unmatched_tracks = self.geometric_assignment.match(self.tracks, detections)
@@ -71,10 +71,7 @@ class MultiObjectTracker(object):
             remaining_detections = unmatched_detections
 
         for detection_indice, track_indice in matches:
-            self.tracks[track_indice].update(detections[detection_indice],
-                                             view,
-                                             camera_matrix,
-                                             dist_coeffs)
+            self.tracks[track_indice].update(detections[detection_indice])
             if self.tracker_type is not None:
                 self.tracks[track_indice].tracker.update(rgb_image,
                                                          self.tracks[track_indice].bbox)

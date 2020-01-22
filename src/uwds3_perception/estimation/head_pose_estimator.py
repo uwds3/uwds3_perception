@@ -1,7 +1,9 @@
 import cv2
 import math
 import numpy as np
-from .facial_landmarks_estimator import RIGHT_EYE_CORNER, LEFT_EYE_CORNER, LEFT_MOUTH_CORNER, RIGHT_MOUTH_CORNER, CHIN, NOSE
+import rospy
+from pyuwds3.types.vector.vector6d import Vector6D
+
 
 class HeadPoseEstimator(object):
     def __init__(self):
@@ -19,8 +21,9 @@ class HeadPoseEstimator(object):
         if previous_head_pose is None:
             _, rot, trans = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
         else:
-            r = previous_head_pose.rotation.to_array()
-            t = previous_head_pose.translation.to_array()
+            r = previous_head_pose.rotation().to_array()
+            t = previous_head_pose.position().to_array()
+            rospy.logwarn(t)
             if r is not None and t is not None:
                 r[1] = r[1] + math.pi
                 t = (t*-1)
@@ -33,4 +36,6 @@ class HeadPoseEstimator(object):
             success = True
             trans = trans * -1
             rot[1] = rot[1] - math.pi
-        return success, trans, rot
+            #rot[0] = .0
+        return success, Vector6D(x=trans[0], y=trans[1], z=trans[2],
+                                 rx=rot[0], ry=rot[1], rz=rot[2])

@@ -3,10 +3,12 @@ import cv2
 import numpy as np
 import uuid
 import uwds3_msgs
-from uwds3_perception.types.features import Features
-from uwds3_perception.types.bbox import BoundingBox, BoundingBoxStabilized
-from uwds3_perception.types.camera import Camera, HumanCamera
-from uwds3_perception.types.vector import Vector6DStabilized
+import rospy
+from pyuwds3.types.bbox import BoundingBox
+from pyuwds3.types.bbox_stable import BoundingBoxStable
+from pyuwds3.types.camera import HumanCamera
+from pyuwds3.types.vector.vector6d_stable import Vector6DStable
+from pyuwds3.types.vector.vector6d import Vector6D
 from tf.transformations import translation_matrix, euler_matrix
 from tf.transformations import translation_from_matrix, quaternion_from_matrix
 from .single_object_tracker import SingleObjectTracker
@@ -14,7 +16,6 @@ from .single_object_tracker import SingleObjectTracker
 
 class TrackState:
     """Represents the track states"""
-
     TENTATIVE = 1
     CONFIRMED = 2
     OCCLUDED = 3
@@ -41,10 +42,10 @@ class Track(object):
 
         self.uuid = str(uuid.uuid4()).replace("-", "")
         self.bbox = detection.bbox
-        self.bbox = BoundingBoxStabilized(detection.bbox.xmin,
-                                          detection.bbox.ymin,
-                                          detection.bbox.xmax,
-                                          detection.bbox.ymax)
+        self.bbox = BoundingBoxStable(detection.bbox.xmin,
+                                      detection.bbox.ymin,
+                                      detection.bbox.xmax,
+                                      detection.bbox.ymax)
         self.label = detection.label
         self.state = TrackState.TENTATIVE
 
@@ -66,24 +67,14 @@ class Track(object):
         if tracker_type is not None:
             self.tracker = SingleObjectTracker(tracker_type)
 
-    def update(self, detection, view, camera_matrix, dist_coeffs):
+    def update(self, detection):
         """Updates the track's bbox"""
         self.bbox.update(detection.bbox.xmin,
                          detection.bbox.ymin,
                          detection.bbox.xmax,
-                         detection.bbox.ymax)
+                         detection.bbox.ymax,
+                         depth=detection.bbox.depth)
         self.features = detection.features
-        if detection.bbox.depth is not None:
-            cx = camera_matrix[0][2]
-            cy = camera_matrix[1][2]
-            fx = camera_matrix[0][0]
-            fy = camera_matrix[1][1]
-            x = (detection.bbox.center().x - cx) * detection.bbox.depth / fx
-            y = (detection.bbox.center().y - cy) * detection.bbox.depth / fy
-            z = detection.bbox.depth
-            position = Vector6D(x=x, y=y, z=z)
-            pose_in_map = view + position
-            self.update_pose(pose_in_map.position)
         self.age = 0
         self.hits += 1
         if self.state == TrackState.TENTATIVE and self.hits >= self.n_init:
@@ -94,20 +85,24 @@ class Track(object):
     def update_pose(self, position, rotation=None):
         if self.pose is None:
             if rotation is not None:
-                self.pose = Vector6DStabilized(x=position.x,
-                                               y=position.y,
-                                               z=position.z)
+                self.pose = Vector6DStable(x=position.x,
+                                           y=position.y,
+                                           z=position.z)
             else:
-                self.pose = Vector6DStabilized(x=position.x,
-                                               y=position.y,
-                                               z=position.z,
-                                               rx=rotation.x,
-                                               ry=rotation.y,
-                                               rz=rotation.z)
+                self.pose = Vector6DStable(x=position.x,
+                                           y=position.y,
+                                           z=position.z,
+                                           rx=rotation.x,
+                                           ry=rotation.y,
+                                           rz=rotation.z)
         else:
-            self.pose.position.update(position.x, position.y, position.z)
+            rospy.logwarn(position)
+            rospy.logwarn(position.x)
+            rospy.logwarn(position.y)
+            rospy.logwarn(position.z)
+            self.pose.pos.update(position.x, position.y, position.z)
             if rotation is not None:
-                self.pose.rotation.update(rotation.x, rotation.y, rotation.z)
+                self.pose.rot.update(rotation.x, rotation.y, rotation.z)
 
     def predict_bbox(self):
         """Predict the bbox location based on motion model (kalman tracker)"""
@@ -163,46 +158,46 @@ class Track(object):
     def has_camera(self):
         return self.camera is not None
 
-    def project_into(self, camera_track):
-        """Returns the 2D bbox in the given camera plane"""
-        if self.is_located() and camera_track.is_located():
-            if self.has_shape() and camera_track.has_camera():
-                success, tf_sensor = camera_track.transform()
-                success, tf_track = self.pose.transform()
-                tf_project = np.dot(np.linalg.inv(tf_sensor), tf_track)
-                camera_matrix = camera_track.camera.camera_matrix()
-                fx = camera_matrix[0][0]
-                fy = camera_matrix[1][1]
-                cx, cy = camera_track.camera.center()
-                z = tf_project[2]
-                w = (self.shape.width() * fx/z)
-                h = (self.shape.height() * fy/z)
-                x = (tf_project[0] * fx/z)+cx
-                y = (tf_project[1] * fy/z)+cy
-                xmin = x - w/2.0
-                ymin = y - h/2.0
-                xmax = x + w/2.0
-                ymax = y + h/2.0
-                if xmax < 0:
-                    return False, None
-                if ymax < 0:
-                    return False, None
-                if xmin > camera_track.camera.width:
-                    return False, None
-                if ymin > camera_track.camera.height:
-                    return False, None
-                if xmin < 0:
-                    xmin = 0
-                if ymin < 0:
-                    ymin = 0
-                if xmax > camera_track.camera.width:
-                    xmax = camera_track.camera.width
-                if ymax > camera_track.camera.height:
-                    ymax = camera_track.camera.height
-                return True, BoundingBox(xmin, ymin, xmax, ymax)
-        return False, None
+    # def project_into(self, camera_track):
+    #     """Returns the 2D bbox in the given camera plane"""
+    #     if self.is_located() and camera_track.is_located():
+    #         if self.has_shape() and camera_track.has_camera():
+    #             success, tf_sensor = camera_track.transform()
+    #             success, tf_track = self.pose.transform()
+    #             tf_project = np.dot(np.linalg.inv(tf_sensor), tf_track)
+    #             camera_matrix = camera_track.camera.camera_matrix()
+    #             fx = camera_matrix[0][0]
+    #             fy = camera_matrix[1][1]
+    #             cx, cy = camera_track.camera.center()
+    #             z = tf_project[2]
+    #             w = (self.shape.width() * fx/z)
+    #             h = (self.shape.height() * fy/z)
+    #             x = (tf_project[0] * fx/z)+cx
+    #             y = (tf_project[1] * fy/z)+cy
+    #             xmin = x - w/2.0
+    #             ymin = y - h/2.0
+    #             xmax = x + w/2.0
+    #             ymax = y + h/2.0
+    #             if xmax < 0:
+    #                 return False, None
+    #             if ymax < 0:
+    #                 return False, None
+    #             if xmin > camera_track.camera.width:
+    #                 return False, None
+    #             if ymin > camera_track.camera.height:
+    #                 return False, None
+    #             if xmin < 0:
+    #                 xmin = 0
+    #             if ymin < 0:
+    #                 ymin = 0
+    #             if xmax > camera_track.camera.width:
+    #                 xmax = camera_track.camera.width
+    #             if ymax > camera_track.camera.height:
+    #                 ymax = camera_track.camera.height
+    #             return True, BoundingBox(xmin, ymin, xmax, ymax)
+    #     return False, None
 
-    def draw(self, image, color, thickness=1):
+    def draw(self, image, color, thickness, camera_matrix, dist_coeffs):
         """Draws the track"""
         if self.is_confirmed():
             track_color = (0, 200, 0, 0)
@@ -216,6 +211,8 @@ class Track(object):
                 text_color = (250, 250, 250)
 
         if self.is_confirmed():
+            if self.is_located():
+                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, self.pose.rotation().to_array(), self.pose.position().to_array(), 0.03)
             self.bbox.draw(image, track_color, 2)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
                                  (self.bbox.xmax, self.bbox.ymax), (200, 200, 200), -1)
@@ -251,9 +248,9 @@ class Track(object):
             msg.is_located = True
             q = self.pose.quaternion()
             msg.pose_stamped.header = header
-            msg.pose_stamped.pose.pose.position.x = self.pose.position.x
-            msg.pose_stamped.pose.pose.position.y = self.pose.position.y
-            msg.pose_stamped.pose.pose.position.z = self.pose.position.z
+            msg.pose_stamped.pose.pose.position.x = self.pose.position().x
+            msg.pose_stamped.pose.pose.position.y = self.pose.position().y
+            msg.pose_stamped.pose.pose.position.z = self.pose.position().z
             msg.pose_stamped.pose.pose.orientation.x = q[0]
             msg.pose_stamped.pose.pose.orientation.y = q[1]
             msg.pose_stamped.pose.pose.orientation.z = q[2]

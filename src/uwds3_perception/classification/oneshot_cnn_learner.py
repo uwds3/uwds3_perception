@@ -3,10 +3,9 @@
 
 import time
 from keras.models import Sequential, Model
-from keras.layers import Dense, Input, Conv2D, MaxPooling2D, merge, Flatten, Lambda
+from keras.layers import Dense, Input, Conv2D, MaxPooling2D, Flatten, Lambda
 from keras.regularizers import l2
 from keras.optimizers import Adam
-from keras.preprocessing.image import ImageDataGenerator
 from sklearn.utils import shuffle
 from keras import backend as K
 import os

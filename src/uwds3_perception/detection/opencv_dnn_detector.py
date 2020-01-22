@@ -2,18 +2,17 @@ import numpy as np
 import cv2
 import math
 import yaml
-from uwds3_perception.types.detection import Detection
+from pyuwds3.types.detection import Detection
+
 
 class OpenCVDNNDetector(object):
     """  """
 
-    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.85, swapRB=False):
+    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.75, swapRB=False):
         """  """
         with open(config_file_path, "r") as f:
             self.config = yaml.load(f)
         self.model = cv2.dnn.readNetFromTensorflow(model, weights)
-        # self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        # self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
         self.input_size = input_size
         self.max_overlap_ratio = max_overlap_ratio
         self.swapRB = swapRB

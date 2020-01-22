@@ -1,6 +1,7 @@
 import cv2
 import dlib
-from uwds3_perception.types.bbox import BoundingBox
+from pyuwds3.types.bbox import BoundingBox
+
 
 class SingleObjectTracker(object):
     def __init__(self, tracker_type):
