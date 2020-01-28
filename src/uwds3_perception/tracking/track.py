@@ -96,10 +96,6 @@ class Track(object):
                                            ry=rotation.y,
                                            rz=rotation.z)
         else:
-            rospy.logwarn(position)
-            rospy.logwarn(position.x)
-            rospy.logwarn(position.y)
-            rospy.logwarn(position.z)
             self.pose.pos.update(position.x, position.y, position.z)
             if rotation is not None:
                 self.pose.rot.update(rotation.x, rotation.y, rotation.z)

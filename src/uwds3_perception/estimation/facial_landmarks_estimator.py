@@ -28,7 +28,7 @@ class FacialLandmarksEstimator(object):
         image_height, image_width, _ = rgb_image.shape
         bbox = face_track.bbox
         gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-        offset = (bbox.ymax-bbox.ymin)*.05
+        offset = (bbox.ymax-bbox.ymin)*.0
         shape = self.predictor(gray, dlib.rectangle(int(bbox.xmin), int(bbox.ymin+offset), int(bbox.xmax), int(bbox.ymax-offset)))
         coords = np.zeros((68, 2), dtype=np.float32)
         for i in range(0, 68):

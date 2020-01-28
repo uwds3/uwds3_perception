@@ -170,10 +170,6 @@ class Uwds3Perception(object):
 
             _, image_height, image_width = bgr_image.shape
 
-            success, view_pose = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
-            if success is not True:
-                raise RuntimeError("The camera sensor is not localized in world space,\
-                        please check if the sensor frame is published in /tf")
             ######################################################
             # Detection
             ######################################################
@@ -247,6 +243,11 @@ class Uwds3Perception(object):
             cy = image_height/2
             min_dist = 10000
 
+            success, view_pose = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
+
+            if success is not True:
+                raise RuntimeError("The camera sensor is not localized in world space, please check if the sensor frame is published in /tf")
+
             for face in face_tracks:
                 if self.face_of_interest_uuid is not None:
                     if self.face_of_interest_uuid != face.uuid:
@@ -319,19 +320,16 @@ class Uwds3Perception(object):
             for track in tracks:
 
                 track.draw(viz_frame, (230, 0, 120, 125), 1, self.camera_matrix, self.dist_coeffs)
-
-                if track.pose is not None:
-                    #header.frame_id = self.global_frame_id
-                    track.pose = track.pose
-                else:
-                    track.pose = None
-
-                if self.as_provider is not False:
-                    header = bgr_image_msg.header
+                scene_node = track.to_msg(header)
+                if scene_node.is_located is True:
                     header.frame_id = self.global_frame_id
-                    scene_changes.changes.nodes.append(track.to_msg(header))
+                    scene_node.pose_stamped.pose.pose = (view_pose + track.pose).to_msg()
                 else:
-                    entity_array.nodes.append(track.to_msg(header))
+                    scene_node.is_located = False
+
+                header = bgr_image_msg.header
+                header.frame_id = self.global_frame_id
+                scene_changes.changes.nodes.append(scene_node)
 
             viz_img_msg = self.bridge.cv2_to_imgmsg(viz_frame)
             if self.as_provider is not False:
@@ -356,8 +354,8 @@ class Uwds3Perception(object):
             ry = trans.transform.rotation.y
             rz = trans.transform.rotation.z
             rw = trans.transform.rotation.w
-
-            return True, Vector6D(x=0.0, y=0.0, z=0.0).from_quaternion(rx, ry, rz, rw)
+            pose = Vector6D(x=x, y=y, z=z).from_quaternion(rx, ry, rz, rw)
+            return True, pose
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn("[perception] Exception occured: {}".format(e))
-            return False, Vector6D(x=0.0, y=0.0, z=0.0).from_quaternion(0.0, 0.0, 0.0, 1.0)
+            return False, None
