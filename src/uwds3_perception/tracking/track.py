@@ -4,14 +4,10 @@ import numpy as np
 import uuid
 import uwds3_msgs
 import rospy
-from pyuwds3.types.bbox import BoundingBox
+from .single_object_tracker import SingleObjectTracker
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
-from pyuwds3.types.vector.vector6d import Vector6D
-from tf.transformations import translation_matrix, euler_matrix
-from tf.transformations import translation_from_matrix, quaternion_from_matrix
-from .single_object_tracker import SingleObjectTracker
 
 
 class TrackState:
@@ -30,7 +26,9 @@ class Track(object):
                  n_init,
                  max_disappeared,
                  max_age,
-                 tracker_type):
+                 similarity_metric,
+                 max_dist,
+                 features_extractor):
         """Track constructor"""
 
         self.n_init = n_init
@@ -49,14 +47,16 @@ class Track(object):
         self.label = detection.label
         self.state = TrackState.TENTATIVE
 
-        self.tracker = None
-        self.filter = None
-
         self.tracking_features = None
 
         self.pose = None
 
         self.shape = None
+
+        self.tracker = SingleObjectTracker(self,
+                                           similarity_metric,
+                                           max_dist,
+                                           features_extractor)
 
         if self.label == "face":
             self.camera = HumanCamera()
@@ -64,8 +64,6 @@ class Track(object):
             self.camera = None
 
         self.features = detection.features
-        if tracker_type is not None:
-            self.tracker = SingleObjectTracker(tracker_type)
 
     def update(self, detection):
         """Updates the track's bbox"""
@@ -209,7 +207,6 @@ class Track(object):
         if self.is_confirmed():
             if self.is_located():
                 cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, self.pose.rotation().to_array(), self.pose.position().to_array(), 0.03)
-            self.bbox.draw(image, track_color, 2)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
                                  (self.bbox.xmax, self.bbox.ymax), (200, 200, 200), -1)
             self.bbox.draw(image, track_color, 2)
@@ -226,9 +223,7 @@ class Track(object):
                         self.label,
                         (self.bbox.xmin+5, self.bbox.ymax-8),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        text_color,
-                        1)
+                        0.5, text_color, 1)
             if "facial_landmarks" in self.features:
                 self.features["facial_landmarks"].draw(image, track_color, thickness)
         elif self.is_occluded():

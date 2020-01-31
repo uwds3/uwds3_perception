@@ -85,14 +85,12 @@ class OneShotCNNLearner(object):
         L1_layer = Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
         L1_distance = L1_layer([embedding_1, embedding_2])
 
-        head_model = Dense(1,
-                           activation='sigmoid',
-                           bias_initializer=initialize_bias)(L1_distance)
+        head_model = Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
 
         siamese_model = Model(inputs=[input_1, input_2], outputs=head_model)
         return siamese_model
 
-    def create_embedding_model(object, input_shape, training_model):
+    def create_embedding_model(self, object, input_shape, training_model):
         base_model = Sequential()
         base_model.add(Conv2D(64, (10, 10),
                        activation='relu',

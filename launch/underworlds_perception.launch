@@ -31,9 +31,9 @@
 
   <!-- Tracker parameters -->
   <arg name="n_init" default="9"/>
-  <arg name="min_iou_distance" default="0.9"/>
-  <arg name="min_color_distance" default="0.9"/>
-  <arg name="min_face_distance" default="0.65"/>
+  <arg name="max_iou_distance" default="0.8"/>
+  <arg name="max_color_distance" default="0.4"/>
+  <arg name="max_face_distance" default="0.2"/>
   <arg name="max_disappeared" default="3"/>
   <arg name="max_age" default="30"/>
 
@@ -76,9 +76,9 @@
       use_faces: $(arg use_faces)
 
       n_init: $(arg n_init)
-      min_iou_distance: $(arg min_iou_distance)
-      min_color_distance: $(arg min_color_distance)
-      min_face_distance: $(arg min_face_distance)
+      max_iou_distance: $(arg max_iou_distance)
+      max_color_distance: $(arg max_color_distance)
+      max_face_distance: $(arg max_face_distance)
       max_disappeared: $(arg max_disappeared)
       max_age: $(arg max_age)
     </rosparam>

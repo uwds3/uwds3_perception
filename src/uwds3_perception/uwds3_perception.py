@@ -2,6 +2,7 @@ import cv2
 import rospy
 import math
 import numpy as np
+from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import Image, CameraInfo
 import message_filters
 from uwds3_msgs.msg import SceneNodeArrayStamped, SceneChangesStamped
@@ -10,12 +11,12 @@ import tf2_ros
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster
 from .detection.opencv_dnn_detector import OpenCVDNNDetector
 from .tracking.multi_object_tracker import MultiObjectTracker, iou_cost, face_cost, color_cost
-from .estimation.shape_estimator import ShapeEstimator
+
 from .estimation.head_pose_estimator import HeadPoseEstimator
 from .estimation.facial_landmarks_estimator import FacialLandmarksEstimator
-from .estimation.facial_features_extractor import FacialFeaturesExtractor
-from .estimation.appearance_features_extractor import AppearanceFeaturesExtractor
-from .estimation.color_features_extractor import ColorFeaturesExtractor
+from .estimation.facial_features_estimator import FacialFeaturesEstimator
+from .estimation.color_features_estimator import ColorFeaturesEstimator
+
 from pyuwds3.types.vector.vector6d import Vector6D
 
 
@@ -49,8 +50,6 @@ class Uwds3Perception(object):
         face_detector_weights_filename = rospy.get_param("~face_detector_weights_filename", "")
         face_detector_config_filename = rospy.get_param("~face_detector_config_filename", "")
 
-        self.shape_estimator = ShapeEstimator()
-
         self.detector = OpenCVDNNDetector(detector_model_filename,
                                           detector_weights_filename,
                                           detector_config_filename,
@@ -68,11 +67,9 @@ class Uwds3Perception(object):
             self.face_of_interest_uuid = None
 
             facial_features_model_filename = rospy.get_param("~facial_features_model_filename", "")
-            self.facial_features_extractor = FacialFeaturesExtractor(facial_features_model_filename)
+            self.facial_features_estimator = FacialFeaturesEstimator(facial_features_model_filename)
 
-        self.appearance_features_extractor = AppearanceFeaturesExtractor(model_type="MobileNetV2")
-
-        self.color_features_extractor = ColorFeaturesExtractor()
+        self.color_features_estimator = ColorFeaturesEstimator()
 
         self.n_frame = rospy.get_param("~n_frame", 2)
         self.frame_count = 0
@@ -94,38 +91,38 @@ class Uwds3Perception(object):
         self.shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
 
         self.n_init = rospy.get_param("~n_init", 6)
-        self.min_iou_distance = rospy.get_param("~min_iou_distance", 0.8)
-        self.min_color_distance = rospy.get_param("~min_color_distance", 0.8)
-        self.min_face_distance = rospy.get_param("~min_face_distance", 0.8)
+        self.max_iou_distance = rospy.get_param("~max_iou_distance", 0.8)
+        self.max_color_distance = rospy.get_param("~max_color_distance", 0.8)
+        self.max_face_distance = rospy.get_param("~max_face_distance", 0.8)
         self.max_disappeared = rospy.get_param("~max_disappeared", 30)
         self.max_age = rospy.get_param("~max_age", 60)
 
         self.object_tracker = MultiObjectTracker(iou_cost,
                                                  color_cost,
-                                                 self.min_iou_distance,
-                                                 self.min_color_distance,
+                                                 self.max_iou_distance,
+                                                 self.max_color_distance,
                                                  self.n_init,
                                                  self.max_disappeared,
                                                  self.max_age,
-                                                 tracker_type=None)
+                                                 tracker_features_extractor=self.color_features_estimator)
 
         self.face_tracker = MultiObjectTracker(iou_cost,
                                                face_cost,
-                                               self.min_iou_distance,
-                                               self.min_face_distance,
+                                               self.max_iou_distance,
+                                               self.max_face_distance,
                                                self.n_init,
                                                self.max_disappeared,
                                                self.max_age,
-                                               tracker_type=None)
+                                               tracker_features_extractor=self.facial_features_estimator)
 
         self.person_tracker = MultiObjectTracker(iou_cost,
                                                  color_cost,
-                                                 self.min_iou_distance,
-                                                 self.min_color_distance,
+                                                 self.max_iou_distance,
+                                                 self.max_color_distance,
                                                  self.n_init,
                                                  self.max_disappeared,
                                                  self.max_age,
-                                                 tracker_type=None)
+                                                 tracker_features_extractor=self.color_features_estimator)
 
         if self.as_provider is False:
             self.tracks_publisher = rospy.Publisher("tracks", SceneNodeArrayStamped, queue_size=1)
@@ -170,6 +167,11 @@ class Uwds3Perception(object):
 
             _, image_height, image_width = bgr_image.shape
 
+            success, view_pose = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
+
+            if success is not True:
+                raise RuntimeError("The camera sensor is not localized in world space, please check if the sensor frame is published in /tf")
+
             ######################################################
             # Detection
             ######################################################
@@ -195,23 +197,24 @@ class Uwds3Perception(object):
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
             ####################################################################
-            # Features extraction
+            # Features estimation
             ####################################################################
 
-            features_timer = cv2.getTickCount()
+            #features_timer = cv2.getTickCount()
 
             if self.frame_count % self.n_frame == 1:
-                self.facial_features_extractor.extract(rgb_image, detections)
+                self.facial_landmarks_estimator.estimate(rgb_image, detections)
+                self.facial_features_estimator.estimate(rgb_image, detections)
             else:
-                self.color_features_extractor.extract(rgb_image, detections)
+                self.color_features_estimator.estimate(rgb_image, detections)
 
-            features_fps = cv2.getTickFrequency() / (cv2.getTickCount() - features_timer)
+            #features_fps = cv2.getTickFrequency() / (cv2.getTickCount() - features_timer)
 
             ######################################################
             # Tracking
             ######################################################
 
-            tracking_timer = cv2.getTickCount()
+            #tracking_timer = cv2.getTickCount()
 
             if self.frame_count % self.n_frame == 1:
                 face_tracks = self.face_tracker.update(rgb_image, detections)
@@ -225,84 +228,19 @@ class Uwds3Perception(object):
                 person_tracks = self.person_tracker.update(rgb_image, person_detections)
             tracks = face_tracks + object_tracks + person_tracks
 
-            tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
+            #tracking_fps = cv2.getTickFrequency() / (cv2.getTickCount() - tracking_timer)
 
             ########################################################
             # Head pose estimation
             ########################################################
-            head_pose_timer = cv2.getTickCount()
+            # head_pose_timer = cv2.getTickCount()
 
-            face_tracks = [t for t in tracks if t.label == "face" and t.is_confirmed()]
-
-            self.facial_features_extractor.extract(rgb_image, face_tracks)
-
-            face_of_interest = None
-            face_of_interest_uuid = None
-
-            cx = image_width/2
-            cy = image_height/2
-            min_dist = 10000
-
-            success, view_pose = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
-
-            if success is not True:
-                raise RuntimeError("The camera sensor is not localized in world space, please check if the sensor frame is published in /tf")
-
-            for face in face_tracks:
-                if self.face_of_interest_uuid is not None:
-                    if self.face_of_interest_uuid != face.uuid:
-                        if "facial_landmarks" in face.features:
-                            del face.features["facial_landmarks"]
-                            face.translation = None
-                            face.rotation = None
-                face_x = face.bbox.center().x
-                face_y = face.bbox.center().y
-                distance_from_center = math.sqrt(pow(cx-face_x, 2)+pow(cy-face_y, 2))
-
-                if min_dist > distance_from_center:
-                    face_of_interest_uuid = face.uuid
-                    face_of_interest = face
-                    min_dist = distance_from_center
-
-            if face_of_interest is not None:
-                landmarks = self.facial_landmarks_estimator.estimate(rgb_image, face)
-
-                if face_of_interest.is_located() is False:
-                    success, pose = self.head_pose_estimator.estimate(landmarks, self.camera_matrix, self.dist_coeffs)
-                else:
-                    if (self.face_of_interest_uuid == face_of_interest.uuid):
-                        success, pose = self.head_pose_estimator.estimate(landmarks, self.camera_matrix, self.dist_coeffs, previous_head_pose=face_of_interest.pose)
-                    else:
-                        success, pose = self.head_pose_estimator.estimate(landmarks, self.camera_matrix, self.dist_coeffs)
-                if success is True:
-                    # if depth_image is not None:
-                    #     success, trans_depth = self.translation_estimator.estimate(face.bbox, depth_image, self.camera_matrix, self.dist_coeffs)
-                    #     if success:
-                    #         face_of_interest.update_pose(face_of_interest.pose.position, rot)
-                    #     else:
-                    #         face_of_interest.update_pose(trans, rot)
-                    # else:
-                    face_of_interest.update_pose(pose.position(), pose.rotation())
-                face_of_interest.features["facial_landmarks"] = landmarks
-
-                self.face_of_interest_uuid = face_of_interest_uuid
-
-            head_pose_fps = cv2.getTickFrequency() / (cv2.getTickCount() - head_pose_timer)
+            self.head_pose_estimator.estimate(face_tracks, self.camera_matrix, self.dist_coeffs)
 
             ######################################################
             # Visualization of debug image and tf publication
             ######################################################
             perception_fps = cv2.getTickFrequency() / (cv2.getTickCount() - perception_timer)
-            #
-            # detection_load = perception_fps / detection_fps
-            # features_load = features_fps / perception_fps
-            # tracking_load = perception_fps / tracking_fps
-            # head_pose_load = perception_fps / head_pose_fps
-            #
-            # cv2.rectangle(viz_frame, (0, 0), (int(image_width*detection_load), 20), (200,0,0), -1)
-            # cv2.rectangle(viz_frame, (int(image_width*detection_load), 0), (int(image_width*features_load), 20), (200,200,0), -1)
-            # cv2.rectangle(viz_frame, (int(image_width*features_load), 0), (int(image_width*tracking_load), 20), (200,0,200), -1)
-            # cv2.rectangle(viz_frame, (int(image_width*tracking_load), 0), (int(image_width*head_pose_load), 20), (200,150,60), -1)
 
             cv2.rectangle(viz_frame, (0, 0), (250, 40), (200, 200, 200), -1)
             perception_fps_str = "Perception fps : {:0.1f}hz".format(perception_fps)
@@ -323,7 +261,9 @@ class Uwds3Perception(object):
                 scene_node = track.to_msg(header)
                 if scene_node.is_located is True:
                     header.frame_id = self.global_frame_id
-                    scene_node.pose_stamped.pose.pose = (view_pose + track.pose).to_msg()
+                    world_pose = view_pose + track.pose
+                    scene_node.pose_stamped.pose.pose = world_pose.to_msg()
+                    #self.publish_tf_pose(scene_node.pose_stamped.pose.pose, header, self.global_frame_id, track.uuid)
                 else:
                     scene_node.is_located = False
 
@@ -339,6 +279,16 @@ class Uwds3Perception(object):
             self.visualization_publisher.publish(viz_img_msg)
 
             self.frame_count += 1
+
+    def publish_tf_pose(self, pose, header, source_frame, target_frame):
+        transform = TransformStamped()
+        transform.child_frame_id = target_frame
+        transform.header.frame_id = source_frame
+        transform.header.stamp = header.stamp
+        transform.transform.translation = pose.position
+        transform.transform.rotation = pose.orientation
+        self.tf_broadcaster.sendTransform(transform)
+
 
     def get_pose_from_tf2(self, source_frame, target_frame, time=None):
         try:

@@ -4,10 +4,10 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 
 class LinearAssignment(object):
     """ """
-    def __init__(self, cost_metric, min_distance=None):
+    def __init__(self, cost_metric, max_distance=None):
         """ """
         self.cost_metric = cost_metric
-        self.min_distance = min_distance
+        self.max_distance = max_distance
 
     def match(self, tracks, detections):
         """ """
@@ -37,10 +37,10 @@ class LinearAssignment(object):
 
         matches = []
         for m in M:
-            if self.min_distance is None:
+            if self.max_distance is None:
                 matches.append(m.reshape(1, 2))
             else:
-                if(C[m[0], m[1]] > self.min_distance):
+                if(C[m[0], m[1]] > self.max_distance):
                     unmatched_detections.append(m[0])
                     unmatched_tracks.append(m[1])
                 else:
