@@ -82,7 +82,7 @@ class Track(object):
 
     def update_pose(self, position, rotation=None):
         if self.pose is None:
-            if rotation is not None:
+            if rotation is None:
                 self.pose = Vector6DStable(x=position.x,
                                            y=position.y,
                                            z=position.z)
@@ -205,7 +205,7 @@ class Track(object):
                 text_color = (250, 250, 250)
 
         if self.is_confirmed():
-            if self.is_located():
+            if self.is_located() and self.is_confirmed():
                 cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, self.pose.rotation().to_array(), self.pose.position().to_array(), 0.03)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
                                  (self.bbox.xmax, self.bbox.ymax), (200, 200, 200), -1)
@@ -226,7 +226,7 @@ class Track(object):
                         0.5, text_color, 1)
             if "facial_landmarks" in self.features:
                 self.features["facial_landmarks"].draw(image, track_color, thickness)
-        elif self.is_occluded():
+        else:
             self.bbox.draw(image, track_color, 1)
 
     def to_msg(self, header, expiration_duration=1.0):

@@ -67,7 +67,8 @@ class Uwds3Perception(object):
             self.face_of_interest_uuid = None
 
             facial_features_model_filename = rospy.get_param("~facial_features_model_filename", "")
-            self.facial_features_estimator = FacialFeaturesEstimator(facial_features_model_filename)
+            face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
+            self.facial_features_estimator = FacialFeaturesEstimator(face_3d_model_filename, facial_features_model_filename)
 
         self.color_features_estimator = ColorFeaturesEstimator()
 
