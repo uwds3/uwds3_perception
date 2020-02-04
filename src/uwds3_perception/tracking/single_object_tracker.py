@@ -34,12 +34,14 @@ class SingleObjectTracker(object):
             xmax = pos.right()
             ymax = pos.bottom()
             det = Detection(xmin, ymin, xmax, ymax, 1.0, self.track.label)
-            self.features_extractor.extract(rgb_image, [det])
+            det.features = self.track.features
+            self.features_extractor.estimate(rgb_image, [det])
             dist = self.similarity_metric(det, self.track)
             if dist > self.max_dist:
                 return False, None
             else:
                 det.confidence = dist
                 return True, det
-        except Exception:
+        except Exception as e:
+            print("{}".format(e))
             return False, None

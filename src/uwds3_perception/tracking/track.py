@@ -4,7 +4,6 @@ import numpy as np
 import uuid
 import uwds3_msgs
 import rospy
-from .single_object_tracker import SingleObjectTracker
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
@@ -22,13 +21,13 @@ class Track(object):
     """Represents a track in both image and world space"""
 
     def __init__(self,
+                 rgb_image,
                  detection,
                  n_init,
                  max_disappeared,
                  max_age,
                  similarity_metric,
-                 max_dist,
-                 features_extractor):
+                 max_dist):
         """Track constructor"""
 
         self.n_init = n_init
@@ -39,24 +38,21 @@ class Track(object):
         self.age = 1
 
         self.uuid = str(uuid.uuid4()).replace("-", "")
-        self.bbox = detection.bbox
+
         self.bbox = BoundingBoxStable(detection.bbox.xmin,
                                       detection.bbox.ymin,
                                       detection.bbox.xmax,
                                       detection.bbox.ymax)
-        self.label = detection.label
-        self.state = TrackState.TENTATIVE
 
-        self.tracking_features = None
+        self.label = detection.label
+
+        if self.hits >= self.n_init:
+            self.state = TrackState.CONFIRMED
+        else:
+            self.state = TrackState.TENTATIVE
 
         self.pose = None
-
         self.shape = None
-
-        self.tracker = SingleObjectTracker(self,
-                                           similarity_metric,
-                                           max_dist,
-                                           features_extractor)
 
         if self.label == "face":
             self.camera = HumanCamera()
@@ -72,7 +68,8 @@ class Track(object):
                          detection.bbox.xmax,
                          detection.bbox.ymax,
                          depth=detection.bbox.depth)
-        self.features = detection.features
+        for name, features in detection.features.items():
+            self.features[name] = features
         self.age = 0
         self.hits += 1
         if self.state == TrackState.TENTATIVE and self.hits >= self.n_init:
@@ -101,12 +98,6 @@ class Track(object):
     def predict_bbox(self):
         """Predict the bbox location based on motion model (kalman tracker)"""
         self.bbox.predict()
-        self.age += 1
-        if self.age > self.max_disappeared:
-            self.state = TrackState.OCCLUDED
-        if self.state == TrackState.OCCLUDED:
-            if self.age > self.max_age:
-                self.state = TrackState.DELETED
 
     def mark_missed(self):
         """Mark the track missed"""
@@ -123,7 +114,7 @@ class Track(object):
 
     def is_perceived(self):
         """Returns True if the track is perceived"""
-        if not self.is_deleted():
+        if not self.to_delete():
             return self.state != TrackState.OCCLUDED
         else:
             return False
@@ -136,7 +127,7 @@ class Track(object):
         """Returns True if the track is occluded"""
         return self.state == TrackState.OCCLUDED
 
-    def is_deleted(self):
+    def to_delete(self):
         """Returns True if the track is deleted"""
         return self.state == TrackState.DELETED
 
@@ -206,7 +197,9 @@ class Track(object):
 
         if self.is_confirmed():
             if self.is_located() and self.is_confirmed():
-                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, self.pose.rotation().to_array(), self.pose.position().to_array(), 0.03)
+                rot = self.pose.rotation().to_array()
+                rot *= -1
+                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rot, self.pose.position().to_array(), 0.1)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
                                  (self.bbox.xmax, self.bbox.ymax), (200, 200, 200), -1)
             self.bbox.draw(image, track_color, 2)

@@ -25,16 +25,16 @@
 
   <!-- Head pose estimation parameters -->
   <arg name="shape_predictor_config_filename" default="$(find uwds3_perception)/models/estimation/shape_predictor_68_face_landmarks.dat"/>
-
+  <arg name="face_3d_model_filename" default="$(find uwds3_perception)/config/estimation/face_3d_model.npy"/>
   <!-- Face embedding parameters -->
   <arg name="facial_features_model_filename" default="$(find uwds3_perception)/models/features/nn4.small2.v1.t7"/>
 
   <!-- Tracker parameters -->
-  <arg name="n_init" default="9"/>
-  <arg name="max_iou_distance" default="0.8"/>
+  <arg name="n_init" default="1"/>
+  <arg name="max_iou_distance" default="0.7"/>
   <arg name="max_color_distance" default="0.4"/>
-  <arg name="max_face_distance" default="0.2"/>
-  <arg name="max_disappeared" default="3"/>
+  <arg name="max_face_distance" default="0.3"/>
+  <arg name="max_disappeared" default="10"/>
   <arg name="max_age" default="30"/>
 
   <!-- Other parameters -->
@@ -67,6 +67,7 @@
       retina_filter_config_filename: $(arg retina_filter_config_filename)
 
       shape_predictor_config_filename: $(arg shape_predictor_config_filename)
+      face_3d_model_filename: $(arg face_3d_model_filename)
 
       facial_features_model_filename: $(arg facial_features_model_filename)
 

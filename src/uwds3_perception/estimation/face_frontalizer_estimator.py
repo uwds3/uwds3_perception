@@ -3,7 +3,12 @@ import numpy as np
 
 
 class FaceFrontalizerEstimator(object):
-    """Tal Hassner, Shai Harel*, Eran Paz* and Roee Enbar, Effective Face Frontalization in Unconstrained Images, IEEE Conf. on Computer Vision and Pattern Recognition (CVPR 2015)"""
+    """Python implementation of :
+    Tal Hassner, Shai Harel*, Eran Paz* and Roee Enbar,
+    Effective Face Frontalization in Unconstrained Images,
+    IEEE Conf. on Computer Vision and Pattern Recognition (CVPR 2015)
+
+    modified from https://github.com/ChrisYang/facefrontalisation"""
     def __init__(self, face_3d_model_filename):
         raise NotImplementedError()
 
