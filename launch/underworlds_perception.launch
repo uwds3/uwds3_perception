@@ -31,9 +31,10 @@
 
   <!-- Tracker parameters -->
   <arg name="n_init" default="1"/>
-  <arg name="max_iou_distance" default="0.7"/>
+  <arg name="max_iou_distance" default="0.9"/>
   <arg name="max_color_distance" default="0.4"/>
   <arg name="max_face_distance" default="0.3"/>
+  <arg name="max_centroid_distance" default="0.4"/>
   <arg name="max_disappeared" default="10"/>
   <arg name="max_age" default="30"/>
 
@@ -43,7 +44,7 @@
   <arg name="only_human" default="true"/>
   <arg name="use_depth" default="false"/>
   <arg name="use_faces" default="true"/>
-  <arg name="n_frame" default="2"/>
+  <arg name="n_frame" default="4"/>
   <arg name="as_provider" default="true"/>
 
   <node name="uwds3_perception" pkg="uwds3_perception" type="uwds3_perception_node.py" args="" output="screen" respawn="false">

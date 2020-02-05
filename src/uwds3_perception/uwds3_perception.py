@@ -54,26 +54,23 @@ class Uwds3Perception(object):
                                           detector_config_filename,
                                           300)
 
-        self.use_faces = rospy.get_param("~use_faces", True)
-        if self.use_faces is True:
-            self.face_detector = OpenCVDNNDetector(face_detector_model_filename,
-                                                   face_detector_weights_filename,
-                                                   face_detector_config_filename,
-                                                   300)
-            # self.face_detector = FaceDetector()
-            shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
-            self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
-            face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
-            self.head_pose_estimator = HeadPoseEstimator(face_3d_model_filename)
-            self.face_of_interest_uuid = None
+        self.face_detector = OpenCVDNNDetector(face_detector_model_filename,
+                                               face_detector_weights_filename,
+                                               face_detector_config_filename,
+                                               300)
+        shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
+        self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
+        face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
+        self.head_pose_estimator = HeadPoseEstimator(face_3d_model_filename)
+        self.face_of_interest_uuid = None
 
-            facial_features_model_filename = rospy.get_param("~facial_features_model_filename", "")
-            face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
-            self.facial_features_estimator = FacialFeaturesEstimator(face_3d_model_filename, facial_features_model_filename)
+        facial_features_model_filename = rospy.get_param("~facial_features_model_filename", "")
+        face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
+        self.facial_features_estimator = FacialFeaturesEstimator(face_3d_model_filename, facial_features_model_filename)
 
         self.color_features_estimator = ColorFeaturesEstimator()
 
-        self.n_frame = rospy.get_param("~n_frame", 2)
+        self.n_frame = rospy.get_param("~n_frame", 4)
         self.frame_count = 0
 
         self.only_human = rospy.get_param("~only_human", False)
@@ -172,39 +169,26 @@ class Uwds3Perception(object):
             detection_timer = cv2.getTickCount()
 
             detections = []
-            if self.use_faces is True:
-                if self.frame_count == 0:
-                    detections = self.detector.detect(rgb_image)
-                if self.frame_count == 1:
-                    detections = self.face_detector.detect(rgb_image)
-                    #self.facial_landmarks_estimator.estimate(rgb_image, detections)
-                else:
-                    detections = []
+            if self.frame_count == 0:
+                detections = self.detector.detect(rgb_image)
+            elif self.frame_count == 1:
+                detections = self.face_detector.detect(rgb_image)
             else:
-                if self.frame_count == 0:
-                    detections = self.detector.detect(rgb_image)
-                else:
-                    detections = []
+                detections = []
 
             detection_fps = cv2.getTickFrequency() / (cv2.getTickCount() - detection_timer)
 
             ####################################################################
             # Features estimation
             ####################################################################
-            #if len(detections) > 0:
-                # if self.frame_count == 0:
             self.color_features_estimator.estimate(rgb_image, detections)
-                # elif self.frame_count == 1:
-                #     #self.facial_landmarks_estimator.estimate(rgb_image, detections)
-                #     self.facial_features_estimator.estimate(rgb_image, detections)
-
-            #features_fps = cv2.getTickFrequency() / (cv2.getTickCount() - features_timer)
 
             ######################################################
             # Tracking
             ######################################################
 
             #tracking_timer = cv2.getTickCount()
+
             if self.frame_count == 0:
                 object_detections = [d for d in detections if d.label != "person"]
                 person_detections = [d for d in detections if d.label == "person"]
@@ -227,11 +211,7 @@ class Uwds3Perception(object):
             ########################################################
             # Head pose estimation
             ########################################################
-            # head_pose_timer = cv2.getTickCount()
 
-            #if self.frame_count % self.n_frame != 1:
-            #     self.facial_landmarks_estimator.estimate(rgb_image, face_tracks)
-            #if self.frame_count == 1 or self.frame_count == 2:
             self.facial_landmarks_estimator.estimate(rgb_image, face_tracks)
             self.head_pose_estimator.estimate(face_tracks, self.camera_matrix, self.dist_coeffs)
 
@@ -260,7 +240,6 @@ class Uwds3Perception(object):
                     if scene_node.is_located is True:
                         header.frame_id = self.global_frame_id
                         world_pose = view_pose + track.pose
-                        #print track.pose.position().to_array().flatten()
                         scene_node.pose_stamped.pose.pose = world_pose.to_msg()
                         #self.publish_tf_pose(scene_node.pose_stamped.pose.pose, header, self.global_frame_id, track.uuid)
                     else:
