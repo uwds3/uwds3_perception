@@ -241,7 +241,8 @@ class Uwds3Perception(object):
                         header.frame_id = self.global_frame_id
                         world_pose = view_pose + track.pose
                         scene_node.pose_stamped.pose.pose = world_pose.to_msg()
-                        self.publish_tf_pose(scene_node.pose_stamped.pose.pose, header, self.global_frame_id, track.uuid)
+                        if self.publish_tf is True:
+                            self.publish_tf_pose(world_pose.to_msg(), header, self.global_frame_id, track.uuid)
                     else:
                         scene_node.is_located = False
 

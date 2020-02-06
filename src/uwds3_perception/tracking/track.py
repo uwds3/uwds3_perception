@@ -4,6 +4,7 @@ import numpy as np
 import uuid
 import uwds3_msgs
 import rospy
+from tf.transformations import euler_matrix
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
@@ -197,8 +198,12 @@ class Track(object):
 
         if self.is_confirmed():
             if self.is_located() and self.is_confirmed():
+                rot = self.pose.rotation().to_array()
+                # for opencv convention
+                R = euler_matrix(rot[0][0], rot[1][0], rot[2][0], "rxyz")
+                rvec = cv2.Rodrigues(R[:3, :3])[0]
                 cv2.drawFrameAxes(image, camera_matrix, dist_coeffs,
-                                  self.pose.rotation().to_array(),
+                                  rvec,
                                   self.pose.position().to_array(), 0.1)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
                                  (self.bbox.xmax, self.bbox.ymax),

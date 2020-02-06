@@ -4,22 +4,37 @@ import rospy
 import math
 import face_alignment
 import dlib
-from pyuwds3.types.detection import Detection
+from pyuwds3.bbox_metrics import iou
+from pyuwds3.types.bbox import BoundingBox
 from pyuwds3.types.landmarks import FacialLandmarks
+
+IOU_CONSITENCY_CHECK = 0.5
+RX_FACING_THRESHOLD = 0.25
+RY_FACING_THRESHOLD = 0.17
 
 
 class FacialLandmarksEstimator(object):
-    def __init__(self, shape_predictor_config_file, facing_threshold=0.2):
+    def __init__(self, shape_predictor_config_file):
         """ """
         self.name = "facial_landmarks"
-        self.facing_threshold = facing_threshold
         self.fan_predictor = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device="cuda", face_detector="folder")
         self.dlib_predictor = dlib.shape_predictor(shape_predictor_config_file)
 
     def __is_facing(self, rx, ry, rz):
-        if abs(abs(ry) - math.pi) < self.facing_threshold:
-            return True
-        return False
+        if abs(rx) > RX_FACING_THRESHOLD:
+            return False
+        if abs(ry - math.pi) > RY_FACING_THRESHOLD:
+            return False
+        return True
+
+    def __check_consistency(self, face, landmarks):
+        xmin_landmarks = np.amin(landmarks[:, 0])
+        ymin_landmarks = np.amin(landmarks[:, 1])
+        xmax_landmarks = np.amax(landmarks[:, 0])
+        ymax_landmarks = np.amax(landmarks[:, 1])
+        landmarks_bb = BoundingBox(xmin_landmarks, ymin_landmarks, xmax_landmarks, ymax_landmarks)
+        iou_cost = iou(landmarks_bb, face.bbox)
+        return IOU_CONSITENCY_CHECK < iou_cost
 
     def estimate(self, rgb_image, faces):
         """ """
@@ -40,9 +55,12 @@ class FacialLandmarksEstimator(object):
             det_with_conf[:4] = f.bbox.to_xyxy().flatten()[:4]
             det_with_conf[4] = 1.0
             detections.append(det_with_conf)
+
         if len(detections) > 0:
             preds = self.fan_predictor.get_landmarks(rgb_image, detections)
             if preds is not None:
                 if len(preds) > 0:
                     for f, landmarks in zip(faces, preds):
-                        f.features[self.name] = FacialLandmarks(landmarks, image_width, image_height)
+                        succes = self.__check_consistency(f, landmarks)
+                        if succes is True:
+                            f.features[self.name] = FacialLandmarks(np.array(landmarks), image_width, image_height)

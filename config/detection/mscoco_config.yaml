@@ -44,7 +44,7 @@
   confidence_threshold : 0.18
 11:
   label : 'fire_hydrant'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 12:
   label : 'stop_sign'
@@ -64,11 +64,11 @@
   confidence_threshold : 0.18
 16:
   label : 'cat'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 17:
   label : 'dog'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 18:
   label : 'horse'
@@ -132,7 +132,7 @@
   confidence_threshold : 0.18
 33:
   label : 'sports_ball'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 34:
   label : 'kite'
@@ -160,15 +160,15 @@
   confidence_threshold : 0.18
 40:
   label : 'bottle'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 41:
   label : 'wine_glass'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 42:
   label : 'cup'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 43:
   label : 'fork'
@@ -176,35 +176,35 @@
   confidence_threshold : 0.18
 44:
   label : 'knife'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 45:
   label : 'spoon'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 46:
   label : 'bowl'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 47:
   label : 'banana'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 48:
   label : 'apple'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 49:
   label : 'sandwich'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 50:
   label : 'orange'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 51:
   label : 'broccoli'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 52:
   label : 'carrot'
@@ -236,7 +236,7 @@
   confidence_threshold : 0.18
 59:
   label : 'potted_plant'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 60:
   label : 'bed'
@@ -244,7 +244,7 @@
   confidence_threshold : 0.18
 61:
   label : 'dining_table'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 62:
   label : 'toilet'
@@ -260,7 +260,7 @@
   confidence_threshold : 0.18
 65:
   label : 'mouse'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 66:
   label : 'remote'
@@ -268,7 +268,7 @@
   confidence_threshold : 0.18
 67:
   label : 'keyboard'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 68:
   label : 'cell_phone'
@@ -296,7 +296,7 @@
   confidence_threshold : 0.18
 74:
   label : 'book'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 75:
   label : 'clock'
@@ -304,7 +304,7 @@
   confidence_threshold : 0.18
 76:
   label : 'vase'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 77:
   label : 'scissors'
@@ -312,7 +312,7 @@
   confidence_threshold : 0.18
 78:
   label : 'teddy_bear'
-  activated : True
+  activated : False
   confidence_threshold : 0.18
 79:
   label : 'hair_drier'

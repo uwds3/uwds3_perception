@@ -15,17 +15,17 @@ class FacialFeaturesEstimator(object):
         else:
             self.frontalizer = None
 
-    def estimate(self, rgb_image, face_detections, camera_matrix=None, dist_coeffs=None):
+    def estimate(self, rgb_image, faces, camera_matrix=None, dist_coeffs=None):
         """Extracts the facial description features"""
         cropped_imgs = []
-        for det in face_detections:
-            x = int(det.bbox.center().x)
-            y = int(det.bbox.center().y)
-            w = int(det.bbox.width())
-            h = int(det.bbox.height())
+        for f in faces:
+            x = int(f.bbox.center().x)
+            y = int(f.bbox.center().y)
+            w = int(f.bbox.width())
+            h = int(f.bbox.height())
             cropped_imgs.append(rgb_image[y:y+h, x:x+w])
             if self.frontalizer is not None:
-                frontalized_img = self.frontalizer.estimate(rgb_image, det, camera_matrix, dist_coeffs)
+                frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
                 cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))
         if len(cropped_imgs) > 0:
             blob = cv2.dnn.blobFromImages(cropped_imgs,
@@ -35,5 +35,5 @@ class FacialFeaturesEstimator(object):
                                           swapRB=False,
                                           crop=False)
             self.model.setInput(blob)
-            for det, features in zip(face_detections, self.model.forward()):
-                det.features[self.name] = Features(self.name, np.array(features).flatten(), h/rgb_image.shape[0])
+            for f, features in zip(faces, self.model.forward()):
+                f.features[self.name] = Features(self.name, np.array(features).flatten(), h/rgb_image.shape[0])

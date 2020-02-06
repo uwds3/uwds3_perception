@@ -40,7 +40,7 @@
 
   <!-- Other parameters -->
   <arg name="publish_visualization_image" default="true"/>
-  <arg name="publish_tf" default="true"/>
+  <arg name="publish_tf" default="false"/>
   <arg name="only_human" default="true"/>
   <arg name="use_depth" default="false"/>
   <arg name="use_faces" default="true"/>
@@ -73,6 +73,7 @@
       facial_features_model_filename: $(arg facial_features_model_filename)
 
       publish_visualization_image: $(arg publish_visualization_image)
+      publish_tf: $(arg publish_tf)
 
       use_depth: $(arg use_depth)
       use_faces: $(arg use_faces)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
+import os
 import rospy
 import cv2
 import sensor_msgs
@@ -11,7 +12,7 @@ from cv_bridge import CvBridge
 class CameraPublisher(object):
     """ """
     def __init__(self):
-        """ Default constructor """
+        """Default constructor"""
 
         self.rgb_image_topic = rospy.get_param("~rgb_image_topic", "/camera/rgb/image_raw")
         self.camera_publisher = rospy.Publisher(self.rgb_image_topic, sensor_msgs.msg.Image, queue_size=1)
@@ -40,7 +41,7 @@ class CameraPublisher(object):
                             [0, focal_length, center[1], 0],
                             [0, 0, 1, 0]], dtype="double")
 
-        dist_coeffs = np.zeros((4,1))
+        dist_coeffs = np.zeros((4, 1))
         self.camera_info.D = list(dist_coeffs)
         self.camera_info.K = list(camera_matrix.flatten())
         self.camera_info.P = list(P_matrix.flatten())
@@ -60,6 +61,7 @@ class CameraPublisher(object):
             bgr_image_msg.header.frame_id = self.camera_frame_id
             self.camera_publisher.publish(bgr_image_msg)
             self.camera_info_publisher.publish(self.camera_info)
+
 
 if __name__ == '__main__':
     rospy.init_node("camera_publisher", anonymous=False)
