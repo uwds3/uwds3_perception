@@ -197,11 +197,12 @@ class Track(object):
 
         if self.is_confirmed():
             if self.is_located() and self.is_confirmed():
-                rot = self.pose.rotation().to_array()
-                rot *= -1
-                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rot, self.pose.position().to_array(), 0.1)
+                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs,
+                                  self.pose.rotation().to_array(),
+                                  self.pose.position().to_array(), 0.1)
             cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
-                                 (self.bbox.xmax, self.bbox.ymax), (200, 200, 200), -1)
+                                 (self.bbox.xmax, self.bbox.ymax),
+                                 (200, 200, 200), -1)
             self.bbox.draw(image, track_color, 2)
             self.bbox.draw(image, text_color, 1)
 
@@ -218,7 +219,9 @@ class Track(object):
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, text_color, 1)
             if "facial_landmarks" in self.features:
-                self.features["facial_landmarks"].draw(image, track_color, thickness)
+                self.features["facial_landmarks"].draw(image,
+                                                       track_color,
+                                                       thickness)
         else:
             self.bbox.draw(image, track_color, 1)
 

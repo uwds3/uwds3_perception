@@ -7,3 +7,4 @@ dlib
 face-alignment
 torch>=1.1
 opencv-python
+opencv-contrib-python

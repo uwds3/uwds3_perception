@@ -9,7 +9,7 @@ from pyuwds3.types.landmarks import FacialLandmarks
 
 
 class FacialLandmarksEstimator(object):
-    def __init__(self, shape_predictor_config_file, facing_threshold=0.219):
+    def __init__(self, shape_predictor_config_file, facing_threshold=0.2):
         """ """
         self.name = "facial_landmarks"
         self.facing_threshold = facing_threshold
@@ -17,7 +17,7 @@ class FacialLandmarksEstimator(object):
         self.dlib_predictor = dlib.shape_predictor(shape_predictor_config_file)
 
     def __is_facing(self, rx, ry, rz):
-        if abs(ry - math.pi) < self.facing_threshold:
+        if abs(abs(ry) - math.pi) < self.facing_threshold:
             return True
         return False
 
@@ -29,7 +29,6 @@ class FacialLandmarksEstimator(object):
             if hasattr(f, "pose") is True:
                 if f.pose is not None:
                     if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
-                        #print("{} is facing".format(f.uuid[:6]))
                         gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
                         shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))
                         coords = np.zeros((68, 2), dtype=np.float32)

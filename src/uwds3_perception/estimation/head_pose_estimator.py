@@ -27,18 +27,17 @@ class HeadPoseEstimator(object):
         """Estimate the head pose of the given face (z forward)"""
         for f in faces:
             if f.is_confirmed():
-                points_2d = f.features["facial_landmarks"].data
-                if f.pose is not None:
-                    r = f.pose.rotation().to_array()
-                    t = f.pose.position().to_array()
-                    r *= -1
-                    success, rot, trans = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE, useExtrinsicGuess=True, rvec=r, tvec=t)
-                    success = self.__check_consistency(trans, rot)
-                else:
-                    success, rot, trans = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-                    success = self.__check_consistency(trans, rot)
-                if success:
-                    rot *= -1
-                    tvec = Vector3D(x=trans[0][0], y=trans[1][0], z=trans[2][0])
-                    rvec = Vector3D(x=rot[0][0], y=rot[1][0], z=rot[2][0])
-                    f.update_pose(tvec, rotation=rvec)
+                if "facial_landmarks" in f.features:
+                    points_2d = f.features["facial_landmarks"].data
+                    if f.pose is not None:
+                        r = f.pose.rotation().to_array()
+                        t = f.pose.position().to_array()
+                        success, rot, trans = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE, useExtrinsicGuess=True, rvec=r, tvec=t)
+                        success = self.__check_consistency(trans, rot)
+                    else:
+                        success, rot, trans = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
+                        success = self.__check_consistency(trans, rot)
+                    if success:
+                        tvec = Vector3D(x=trans[0][0], y=trans[1][0], z=trans[2][0])
+                        rvec = Vector3D(x=rot[0][0], y=rot[1][0], z=rot[2][0])
+                        f.update_pose(tvec, rotation=rvec)
