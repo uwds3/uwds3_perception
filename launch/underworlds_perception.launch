@@ -35,7 +35,7 @@
   <arg name="max_color_distance" default="0.4"/>
   <arg name="max_face_distance" default="0.3"/>
   <arg name="max_centroid_distance" default="0.4"/>
-  <arg name="max_disappeared" default="6"/>
+  <arg name="max_disappeared" default="10"/>
   <arg name="max_age" default="20"/>
 
   <!-- Other parameters -->

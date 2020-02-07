@@ -39,25 +39,30 @@ class FacialLandmarksEstimator(object):
     def estimate(self, rgb_image, faces):
         """ """
         image_height, image_width, _ = rgb_image.shape
-        detections = []
+        detections_for_fan = []
         for f in faces:
+            use_dlib = False
             if hasattr(f, "pose") is True:
                 if f.pose is not None:
                     if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
-                        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-                        shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))
-                        coords = np.zeros((68, 2), dtype=np.float32)
-                        for i in range(0, 68):
-                            coords[i] = (shape.part(i).x, shape.part(i).y)
-                        f.features[self.name] = FacialLandmarks(coords, image_width, image_height)
-                        continue
-            det_with_conf = np.zeros((5,), dtype=np.float32)
-            det_with_conf[:4] = f.bbox.to_xyxy().flatten()[:4]
-            det_with_conf[4] = 1.0
-            detections.append(det_with_conf)
+                        use_dlib = True
+                else:
+                    use_dlib = True
+            if use_dlib is True:
+                gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+                shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))
+                coords = np.zeros((68, 2), dtype=np.float32)
+                for i in range(0, 68):
+                    coords[i] = (shape.part(i).x, shape.part(i).y)
+                f.features[self.name] = FacialLandmarks(coords, image_width, image_height)
+            else:
+                det_with_conf = np.zeros((5,), dtype=np.float32)
+                det_with_conf[:4] = f.bbox.to_xyxy().flatten()[:4]
+                det_with_conf[4] = 1.0
+                detections_for_fan.append(det_with_conf)
 
-        if len(detections) > 0:
-            preds = self.fan_predictor.get_landmarks(rgb_image, detections)
+        if len(detections_for_fan) > 0:
+            preds = self.fan_predictor.get_landmarks(rgb_image, detections_for_fan)
             if preds is not None:
                 if len(preds) > 0:
                     for f, landmarks in zip(faces, preds):
