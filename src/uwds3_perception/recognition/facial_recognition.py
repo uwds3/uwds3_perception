@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import cv2
+from scipy.spatial.distance import euclidean, cosine
 from ..detection.opencv_dnn_detector import OpenCVDNNDetector
 from ..estimation.facial_features_estimator import FacialFeaturesEstimator
 
@@ -10,7 +11,8 @@ class OpenFaceRecognition(object):
                  input_shape,
                  detector_model_filename,
                  detector_weights_filename,
-                 frontalize=False):
+                 frontalize=False,
+                 metric_distance="euclidean"):
         raise NotImplementedError()
         # self.detector =
         # self.embedder =
