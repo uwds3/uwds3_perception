@@ -59,7 +59,7 @@ class KNearestNeighborsAssignement(object):
         distances, matchs = self.model.kneighbors([feature])
         distance = distances[0]
         if distance > self.max_distance:
-            return False, "", 0.0
+            return False, "unknown", 0.0
         indice = matchs[0][0]
         label = self.Y[indice]
         return True, label, distance

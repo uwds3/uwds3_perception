@@ -8,9 +8,8 @@ import argparse
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Record RGB snapshots for machine learning")
     parser.add_argument('label', type=str, help='The label used to name the data directory')
-    parser.add_argument("-d", "--data_dir", type=str, default="/tmp/", help="The root data directory (default '/tmp/')")
+    parser.add_argument("-d", "--data_dir", type=str, default="/tmp/snapshots/", help="The root data directory (default '/tmp/snapshots/')")
     args = parser.parse_args()
-
     snapshot_directory = args.data_dir + args.label + "/"
 
     try:
@@ -21,7 +20,6 @@ if __name__ == '__main__':
     snapshot_index = 0
 
     capture = cv2.VideoCapture(0)
-
     while True:
         ok, frame = capture.read()
         if ok:

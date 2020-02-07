@@ -63,4 +63,4 @@ class FacialLandmarksEstimator(object):
                     for f, landmarks in zip(faces, preds):
                         succes = self.__check_consistency(f, landmarks)
                         if succes is True:
-                            f.features[self.name] = FacialLandmarks(np.array(landmarks), image_width, image_height)
+                            f.features[self.name] = FacialLandmarks(landmarks, image_width, image_height)

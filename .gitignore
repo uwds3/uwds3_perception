@@ -1,5 +1,6 @@
 models/
 data/omniglot/
+data/face_recognition/
 
 devel/
 logs/

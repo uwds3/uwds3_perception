@@ -1,8 +1,10 @@
 numpy>=1.11.1
 scipy>=0.14
 uuid
+argparse
 scikit-image
 scikit-learn
+matplotlib
 dlib
 face-alignment
 torch>=1.1
