@@ -43,7 +43,13 @@ class OpenFaceRecognition(object):
 
 class FacialRecognitionDataLoader(object):
     def __init__(self, train_directory_path, val_directory_path):
-        raise NotImplementedError()
+        print("Start loading the dataset:\r\n'{}'\r\n'{}'".format(train_directory_path, val_directory_path))
+        self.X_train, self.Y_train, self.train_classes = self.load_dataset(train_directory_path)
+        self.X_val, self.Y_val, self.val_classes = self.load_dataset(val_directory_path)
+        print("Training categories ({} different):".format(len(self.train_classes.keys())))
+        print("{}\r\n".format(self.train_classes.keys()))
+        print("Validation categories ({} different from training):".format(len(self.val_classes.keys())))
+        print("{}\r\n".format(self.val_classes.keys()))
 
     def load_dataset(self, data_directory_path, n=0):
         X_data = []
