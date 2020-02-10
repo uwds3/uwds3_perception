@@ -2,19 +2,28 @@ import os
 import numpy as np
 import cv2
 from scipy.spatial.distance import euclidean, cosine
-from ..detection.opencv_dnn_detector import OpenCVDNNDetector
-from ..estimation.facial_features_estimator import FacialFeaturesEstimator
-from ..detection.face_detector import FaceDetector
+from uwds3_perception.detection.opencv_dnn_detector import OpenCVDNNDetector
+from uwds3_perception.estimation.facial_features_estimator import FacialFeaturesEstimator
+from uwds3_perception.detection.face_detector import FaceDetector
 from pyuwds3.types.features import Features
 
+
+embedding_model_file = "/home/abonneau/catkin_ws/src/uwds3_perception/models/features/nn4.small.v1.t7"
+detector_model_proto = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector.pbtxt"
+detector_model_weights = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector_uint8.pb"
+detector_config_filename = "/home/abonneau/catkin_ws/src/uwds3_perception/config/detection/face_config.yaml"
 class OpenFaceRecognition(object):
     def __init__(self,
                  input_shape,
                  detector_model_filename,
                  detector_weights_filename,
+                 detector_config_filename,
                  frontalize=False,
                  metric_distance="euclidean"):
-        self.face_detector = FaceDetector()
+        self.face_detector = OpenCVDNNDetector(detector_model_filename,
+                                               detector_weights_filename,
+                                               detector_config_filename,
+                                               300)
         self.detector_model_filename = detector_model_filename
         self.facial_features_estimator = FacialFeaturesEstimator( detector_model_filename,detector_weights_filename)
         self.input_shape = input_shape
@@ -77,9 +86,9 @@ class FacialRecognitionDataLoader(object):
         """
         n_correct = 0
         if verbose:
-            print("Evaluating model {} on {} random {} way recognition tasks...".format(trials, N_way))
+            print("Evaluating model {} on {} random  way recognition tasks...".format(trials, N_way))
         for i in range(trials):
-            true_person,support_set, targets = self.make_oneshot_task(N_way, mode=mode)
+            true_person,support_set, targets = self.make_recognition_task(N_way, mode=mode)
             probs = []
             for i in support_set:
                 probs.append(model.predict(true_person,support_test))
@@ -117,3 +126,14 @@ class FacialRecognitionDataLoader(object):
         targets, support_set = shuffle(targets, support_set)
 
         return ex1,support_set, targets
+
+if __name__ == '__main__':
+    embedding_model_file = "/home/abonneau/catkin_ws/src/uwds3_perception/models/features/nn4.small2.v1.t7"
+    detector_model_proto = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector.pbtxt"
+    detector_model_weights = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector_uint8.pb"
+    detector_config_filename = "/home/abonneau/catkin_ws/src/uwds3_perception/config/detection/face_config.yaml"
+
+frdl = FacialRecognitionDataLoader("k","j")
+frdl.load_dataset("/home/abonneau/catkin_ws/src/uwds3_perception/src/uwds3_perception/recognition/snapshots")
+frdl.test_recognition(detector_model_proto,25,25)
+ofd = OpenFaceRecognition(300, detector_model_weights,detector_config_filename)
