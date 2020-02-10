@@ -111,3 +111,9 @@ class FacialRecognitionDataLoader(object):
         indices = rng.choice((range(true_person) + range(true_person+1, n_examples)),N_way-1)
         support_set = [ex2]
         for i in indices:
+            support_set.append(rng.choice(X[i]))
+        targets = np.zeros((N_way,))
+        targets[0] = 1
+        targets, support_set = shuffle(targets, support_set)
+
+        return ex1,support_set, targets
