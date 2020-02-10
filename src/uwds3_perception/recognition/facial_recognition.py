@@ -43,7 +43,8 @@ class OpenFaceRecognition(object):
 
 class FacialRecognitionDataLoader(object):
     def __init__(self, train_directory_path, val_directory_path):
-        raise NotImplementedError()
+        #raise NotImplementedError()
+        return
 
     def load_dataset(self, data_directory_path, n=0):
         X_data = []
@@ -70,7 +71,7 @@ class FacialRecognitionDataLoader(object):
         print(Y_data.shape)
         return X_data, Y_data, individual_dict
 
-   def test_recognition(self, model, N_way, trials, mode="val", verbose=True):
+    def test_recognition(self, model, N_way, trials, mode="val", verbose=True):
         """
         Tests average N way recognition accuracy of the embedding net over k trials
         """
@@ -90,7 +91,7 @@ class FacialRecognitionDataLoader(object):
         return percent_correct
 
     def make_recognition_task(self, N_way, mode="val", person=None):
-          """
+        """
         Creates pairs of test image, support set for testing N way learning.
         """
         if mode == 'train':
