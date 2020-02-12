@@ -9,15 +9,17 @@ from pyuwds3.types.bbox import BoundingBox
 from pyuwds3.types.landmarks import FacialLandmarks
 
 IOU_CONSITENCY_CHECK = 0.5
-RX_FACING_THRESHOLD = 0.25
-RY_FACING_THRESHOLD = 0.17
+RX_FACING_THRESHOLD = 1.57
+RY_FACING_THRESHOLD = 1.57
 
 
 class FacialLandmarksEstimator(object):
-    def __init__(self, shape_predictor_config_file):
+    def __init__(self, shape_predictor_config_file, only_dlib=True):
         """ """
         self.name = "facial_landmarks"
-        self.fan_predictor = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device="cuda", face_detector="folder")
+        self.only_dlib = only_dlib
+        if self.only_dlib is not True:
+            self.fan_predictor = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device="cuda", face_detector="folder")
         self.dlib_predictor = dlib.shape_predictor(shape_predictor_config_file)
 
     def __is_facing(self, rx, ry, rz):
@@ -42,12 +44,15 @@ class FacialLandmarksEstimator(object):
         detections_for_fan = []
         for f in faces:
             use_dlib = False
-            if hasattr(f, "pose") is True:
-                if f.pose is not None:
-                    if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
+            if self.only_dlib is not True:
+                if hasattr(f, "pose") is True:
+                    if f.pose is not None:
+                        if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
+                            use_dlib = True
+                    else:
                         use_dlib = True
-                else:
-                    use_dlib = True
+            else:
+                use_dlib = True
             if use_dlib is True:
                 gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
                 shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))

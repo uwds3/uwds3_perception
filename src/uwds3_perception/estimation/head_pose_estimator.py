@@ -4,7 +4,7 @@ import numpy as np
 from tf.transformations import euler_matrix, euler_from_matrix, is_same_transform
 from pyuwds3.types.vector.vector6d import Vector3D
 
-MAX_DIST = 1.5
+MAX_DIST = 2.5
 
 RX_OFFSET = - math.pi/2.0
 RY_OFFSET = math.pi

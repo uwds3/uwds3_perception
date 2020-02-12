@@ -60,7 +60,7 @@ class MultiObjectTracker(object):
         if len(detections) > 0:
             first_matches, unmatched_detections, unmatched_tracks = self.geometric_assignment.match(self.tracks, detections)
 
-            # Then we try to assign de detections to the tracks that didn't match based on the features
+            # Then we try to assign the detections to the tracks that didn't match based on the features
             if len(unmatched_tracks) > 0 and len(unmatched_detections) > 0:
                 trks = [self.tracks[t] for t in unmatched_tracks]
                 dets = [detections[d] for d in unmatched_detections]
@@ -74,14 +74,27 @@ class MultiObjectTracker(object):
 
             for detection_indice, track_indice in matches:
                 self.tracks[track_indice].update(detections[detection_indice])
+                self.tracks[track_indice].tracker.update(rgb_image, detections[detection_indice])
         else:
             remaining_tracks = np.arange(len(self.tracks))
             remaining_detections = []
 
         for track_indice in remaining_tracks:
-            self.tracks[track_indice].mark_missed()
-            if self.tracks[track_indice].is_confirmed() and not self.tracks[track_indice].is_occluded():
-                self.tracks[track_indice].predict_bbox()
+            if self.tracks[track_indice].is_confirmed():
+                success, detection = self.tracks[track_indice].tracker.predict(rgb_image)
+                if success is True:
+                    self.tracks[track_indice].update(detection)
+                else:
+                    self.tracks[track_indice].predict_bbox()
+                self.tracks[track_indice].mark_missed()
+            elif self.tracks[track_indice].is_occluded():
+                success, detection = self.tracks[track_indice].tracker.predict(rgb_image)
+                if success is True:
+                    self.tracks[track_indice].update(detection)
+                else:
+                    self.tracks[track_indice].mark_missed()
+            else:
+                self.tracks[track_indice].mark_missed()
 
         for detection_indice in remaining_detections:
             self.start_track(rgb_image, detections[detection_indice])
@@ -92,11 +105,10 @@ class MultiObjectTracker(object):
 
     def start_track(self, rgb_image, detection):
         """Start to track a detection"""
-        self.tracks.append(Track(rgb_image,
-                                 detection,
+        self.tracks.append(Track(detection,
                                  self.n_init,
                                  self.max_disappeared,
-                                 self.max_age,
-                                 self.features_metric,
-                                 self.max_distance_feat))
+                                 self.max_age))
+        track_indice = len(self.tracks)-1
+        self.tracks[track_indice].tracker.update(rgb_image, self.tracks[track_indice])
         return len(self.tracks)-1

@@ -1,6 +1,8 @@
-numpy>=1.11.1
-scipy>=0.14
+numpy>=1.11.0
+scipy>=0.1
 uuid
+pyyaml
+future
 argparse
 scikit-image
 scikit-learn

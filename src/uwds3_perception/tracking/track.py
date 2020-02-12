@@ -5,6 +5,8 @@ import uuid
 import uwds3_msgs
 import rospy
 from tf.transformations import euler_matrix
+from .dlib_tracker import DlibTracker
+from .opencv_tracker import OpenCVTracker
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
@@ -22,13 +24,10 @@ class Track(object):
     """Represents a track in both image and world space"""
 
     def __init__(self,
-                 rgb_image,
                  detection,
                  n_init,
                  max_disappeared,
-                 max_age,
-                 similarity_metric,
-                 max_dist):
+                 max_age):
         """Track constructor"""
 
         self.n_init = n_init
@@ -54,6 +53,8 @@ class Track(object):
 
         self.pose = None
         self.shape = None
+
+        self.tracker = OpenCVTracker()
 
         if self.label == "face":
             self.camera = HumanCamera()

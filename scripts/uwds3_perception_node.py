@@ -15,6 +15,7 @@ class Uwds3PerceptionNode(object):
         while not rospy.is_shutdown():
             rospy.spin()
 
+
 if __name__ == '__main__':
     rospy.init_node("uwds3_perception")
     core = Uwds3PerceptionNode().run()

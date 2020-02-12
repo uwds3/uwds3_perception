@@ -8,7 +8,7 @@ from pyuwds3.types.detection import Detection
 class OpenCVDNNDetector(object):
     """  """
 
-    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.75, swapRB=False):
+    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.6, swapRB=False):
         """  """
         with open(config_file_path, "r") as f:
             self.config = yaml.load(f)

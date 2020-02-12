@@ -102,7 +102,7 @@ class Uwds3Perception(object):
         self.face_tracker = MultiObjectTracker(iou_cost,
                                                centroid_cost,
                                                self.max_iou_distance,
-                                               self.max_centroid_distance,
+                                               None,
                                                self.n_init,
                                                self.max_disappeared,
                                                self.max_age)
