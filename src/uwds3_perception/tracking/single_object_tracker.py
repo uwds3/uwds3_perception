@@ -27,8 +27,6 @@ class SingleObjectTracker(object):
         success, bbox = self.mediaflow_tracker.update(rgb_image)
         bgr_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
         xmin, ymin, width, height = bbox
-        if xmin < 0 or ymin < 0:
-            return False, None
         xmin = 0 if xmin < 0 else xmin
         ymin = 0 if ymin < 0 else ymin
         if width < 10 or height < 10:
@@ -36,8 +34,6 @@ class SingleObjectTracker(object):
         det = Detection(xmin, ymin, xmin+width, ymin+height, self.object_label, 1.0)
         hsv_hist = self.__compute_histogram(bgr_image, det)
         distance = 1 - cosine(self.hsv_hist, hsv_hist)
-        if self.object_label == "thing":
-            print distance
         if distance > self.max_hsv_distance:
             return False, None
         else:
