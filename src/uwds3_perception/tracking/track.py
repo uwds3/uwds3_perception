@@ -7,6 +7,7 @@ import rospy
 from tf.transformations import euler_matrix
 from .dlib_tracker import DlibTracker
 from .opencv_tracker import OpenCVTracker
+from .single_object_tracker import SingleObjectTracker
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
@@ -53,8 +54,8 @@ class Track(object):
 
         self.pose = None
         self.shape = None
-
-        self.tracker = OpenCVTracker()
+        
+        self.tracker = SingleObjectTracker()
 
         if self.label == "face":
             self.camera = HumanCamera()

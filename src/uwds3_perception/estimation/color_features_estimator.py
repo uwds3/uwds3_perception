@@ -11,12 +11,13 @@ class ColorFeaturesEstimator(object):
     def estimate(self, rgb_image, detections=None):
         """Extracts hue channel histogram as a features vector"""
         for det in detections:
-            x = int(det.bbox.center().x)
-            y = int(det.bbox.center().y)
+            xmin = int(det.bbox.xmin)
+            ymin = int(det.bbox.ymin)
             w = int(det.bbox.width())
             h = int(det.bbox.height())
-            cropped_image = rgb_image[y:y+h, x:x+w]
+            cropped_image = rgb_image[ymin:ymin+h, xmin:xmin+w]
             hsv = cv2.cvtColor(cropped_image, cv2.COLOR_RGB2HSV)
-            hist = cv2.calcHist([hsv], [0], None, [180], [0, 180])
-            hist = hist / np.max(hist)
-            det.features[self.name] = Features(self.name, hist[:, 0], h/float(rgb_image.shape[0]))
+            mask = cv2.inRange(hsv, np.array((0., 60., 32.)), np.array((180., 255., 255.)))
+            hist = cv2.calcHist([hsv], [0], mask, [180], [0, 180])
+            hist = cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX)/float(np.amax(hist))
+            det.features[self.name] = Features(self.name, hist, h/float(rgb_image.shape[0]))

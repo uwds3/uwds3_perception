@@ -80,18 +80,13 @@ class MultiObjectTracker(object):
             remaining_detections = []
 
         for track_indice in remaining_tracks:
-            if self.tracks[track_indice].is_confirmed():
+            if self.tracks[track_indice].is_confirmed() or self.tracks[track_indice].is_occluded():
                 success, detection = self.tracks[track_indice].tracker.predict(rgb_image)
                 if success is True:
                     self.tracks[track_indice].update(detection)
                 else:
-                    self.tracks[track_indice].predict_bbox()
-                self.tracks[track_indice].mark_missed()
-            elif self.tracks[track_indice].is_occluded():
-                success, detection = self.tracks[track_indice].tracker.predict(rgb_image)
-                if success is True:
-                    self.tracks[track_indice].update(detection)
-                else:
+                    if self.tracks[track_indice].is_confirmed():
+                        self.tracks[track_indice].predict_bbox()
                     self.tracks[track_indice].mark_missed()
             else:
                 self.tracks[track_indice].mark_missed()
