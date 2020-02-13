@@ -11,9 +11,9 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--data_dir", type=str, default="/tmp/snapshots/", help="The root data directory (default '/tmp/snapshots/')")
     args = parser.parse_args()
     snapshot_directory = args.data_dir + args.label + "/"
-    detector_model = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector_uint8.pb"
-    detector_model_txt = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector.pbtxt"
-    detector_config_filename = "/home/abonneau/catkin_ws/src/uwds3_perception/config/detection/face_config.yaml"
+    detector_model = "../../../models/detection/opencv_face_detector_uint8.pb"
+    detector_model_txt = "../../../models/detection/opencv_face_detector.pbtxt"
+    detector_config_filename = "../../../config/detection/face_config.yaml"
     face_detector = OpenCVDNNDetector(detector_model,
                                         detector_model_txt,
                                         detector_config_filename,
