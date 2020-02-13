@@ -3,7 +3,7 @@
 import os
 import cv2
 import argparse
-
+from uwds3_perception.detection.opencv_dnn_detector import OpenCVDNNDetector
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Record RGB snapshots for machine learning")
@@ -11,6 +11,13 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--data_dir", type=str, default="/tmp/snapshots/", help="The root data directory (default '/tmp/snapshots/')")
     args = parser.parse_args()
     snapshot_directory = args.data_dir + args.label + "/"
+    detector_model = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector_uint8.pb"
+    detector_model_txt = "/home/abonneau/catkin_ws/src/uwds3_perception/models/detection/opencv_face_detector.pbtxt"
+    detector_config_filename = "/home/abonneau/catkin_ws/src/uwds3_perception/config/detection/face_config.yaml"
+    face_detector = OpenCVDNNDetector(detector_model,
+                                        detector_model_txt,
+                                        detector_config_filename,
+                                        300)
 
     try:
         os.makedirs(snapshot_directory)
@@ -22,11 +29,16 @@ if __name__ == '__main__':
     capture = cv2.VideoCapture(0)
     while True:
         ok, frame = capture.read()
+        viz_frame = frame.copy()
         if ok:
+            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            face_list = face_detector.detect(rgb_image)
+            if len(face_list)>0:
+                face_list[0].draw(frame,(230, 0, 120))
             k = cv2.waitKey(1) & 0xFF
-            if k == 32:
+            if k == 32 and len(face_list)>0:
                 print("Save image "+str(snapshot_index)+".jpg !")
-                cv2.imwrite(snapshot_directory+str(snapshot_index)+".jpg", frame)
+                cv2.imwrite(snapshot_directory+str(snapshot_index)+".jpg", viz_frame)
                 snapshot_index += 1
                 cv2.imshow("Snapshot recorder", (255-frame))
             else:
