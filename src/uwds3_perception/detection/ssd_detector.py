@@ -5,7 +5,7 @@ import yaml
 from pyuwds3.types.detection import Detection
 
 
-class OpenCVDNNDetector(object):
+class SSDDetector(object):
     """  """
 
     def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.6, swapRB=False):

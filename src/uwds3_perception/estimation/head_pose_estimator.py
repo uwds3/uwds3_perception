@@ -2,7 +2,8 @@ import cv2
 import math
 import numpy as np
 from tf.transformations import euler_matrix, euler_from_matrix, is_same_transform
-from pyuwds3.types.vector.vector6d import Vector3D
+from pyuwds3.types.vector.vector6d import Vector6D
+from pyuwds3.types.vector.vector3d import Vector3D
 
 MAX_DIST = 2.5
 
@@ -40,15 +41,17 @@ class HeadPoseEstimator(object):
         rvec = cv2.Rodrigues(R[:3, :3])[0]
         return rvec
 
-    def estimate(self, faces, camera_matrix, dist_coeffs):
+    def estimate(self, faces, view_matrix, camera_matrix, dist_coeffs):
         """Estimate the head pose of the given face (z forward for rendering)"""
         for f in faces:
             if f.is_confirmed():
                 if "facial_landmarks" in f.features:
                     points_2d = f.features["facial_landmarks"].data
                     if f.pose is not None:
-                        r = f.pose.rotation().to_array()
-                        t = f.pose.position().to_array()
+                        world_transform = f.pose.transform()
+                        sensor_pose = Vector6D().from_transform(np.dot(np.linalg.inv(world_transform), world_transform))
+                        r = sensor_pose.rotation().to_array()
+                        t = sensor_pose.position().to_array()
                         self.__add_offset(r, -RX_OFFSET, -RY_OFFSET, -RZ_OFFSET)
                         rvec = self.__euler2rodrigues(r)
                         success, rvec, tvec, _ = cv2.solvePnPRansac(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE, useExtrinsicGuess=True, rvec=rvec, tvec=t)
@@ -59,6 +62,7 @@ class HeadPoseEstimator(object):
                     if success:
                         r = self.__rodrigues2euler(rvec)
                         self.__add_offset(r, RX_OFFSET, RY_OFFSET, RZ_OFFSET)
-                        trans = Vector3D(x=tvec[0][0], y=tvec[1][0], z=tvec[2][0])
-                        rot = Vector3D(x=r[0][0], y=r[1][0], z=r[2][0])
-                        f.update_pose(trans, rotation=rot)
+                        sensor_pose = Vector6D(x=tvec[0][0], y=tvec[1][0], z=tvec[2][0],
+                                               rx=r[0][0], ry=r[1][0], rz=.0)#r[2][0])
+                        world_pose = Vector6D().from_transform(np.dot(view_matrix, sensor_pose.transform()))
+                        f.update_pose(world_pose.position(), rotation=world_pose.rotation())

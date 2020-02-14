@@ -68,7 +68,6 @@ class KNearestNeighborsAssignement(object):
         """
         """
         pass
-        # TODO: save data
 
 if __name__ == '__main__':
     knn = KNearestNeighborsAssignement("test_face", 0.53)

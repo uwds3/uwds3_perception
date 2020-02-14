@@ -9,6 +9,7 @@ class FacialFeaturesEstimator(object):
     def __init__(self, face_3d_model_filename, embedding_model_filename, frontalize=False):
         """FacialFeaturesEstimator constructor"""
         self.name = "facial_description"
+        self.dimensions = (128, 0)
         self.model = cv2.dnn.readNetFromTorch(embedding_model_filename)
         if frontalize is True:
             self.frontalizer = FaceFrontalizerEstimator(face_3d_model_filename)
@@ -19,14 +20,15 @@ class FacialFeaturesEstimator(object):
         """Extracts the facial description features"""
         cropped_imgs = []
         for f in faces:
-            xmin = int(f.bbox.xmin)
-            ymin = int(f.bbox.ymin)
-            w = int(f.bbox.width())
-            h = int(f.bbox.height())
-            cropped_imgs.append(rgb_image[ymin:ymin+h, xmin:xmin+w])
-            if self.frontalizer is not None:
-                frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
-                cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))
+            if "facial_description" not in f.features:
+                xmin = int(f.bbox.xmin)
+                ymin = int(f.bbox.ymin)
+                w = int(f.bbox.width())
+                h = int(f.bbox.height())
+                cropped_imgs.append(rgb_image[ymin:ymin+h, xmin:xmin+w])
+                if self.frontalizer is not None:
+                    frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
+                    cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))
         if len(cropped_imgs) > 0:
             blob = cv2.dnn.blobFromImages(cropped_imgs,
                                           1.0 / 255,
@@ -36,4 +38,4 @@ class FacialFeaturesEstimator(object):
                                           crop=False)
             self.model.setInput(blob)
             for f, features in zip(faces, self.model.forward()):
-                f.features[self.name] = Features(self.name, np.array(features).flatten(), h/rgb_image.shape[0])
+                f.features[self.name] = Features(self.name, self.dimensions, np.array(features), float(h)/rgb_image.shape[0])
