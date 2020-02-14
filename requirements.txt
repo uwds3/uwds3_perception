@@ -2,14 +2,10 @@ numpy>=1.11.0
 scipy>=0.1
 uuid
 pyyaml
-future
 argparse
 scikit-image
 scikit-learn
 matplotlib
 dlib
-face-alignment
-future
-torch>=1.1
 opencv-python
 opencv-contrib-python
