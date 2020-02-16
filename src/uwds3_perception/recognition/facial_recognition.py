@@ -6,6 +6,7 @@ from scipy.spatial.distance import euclidean, cosine
 from uwds3_perception.detection.opencv_dnn_detector import OpenCVDNNDetector
 from uwds3_perception.estimation.facial_features_estimator import FacialFeaturesEstimator
 from uwds3_perception.detection.face_detector import FaceDetector
+from uwds3_perception.recognition.knn_assignement import KNearestNeighborsAssignement
 from pyuwds3.types.features import Features
 import numpy.random as rng
 import time
@@ -42,6 +43,7 @@ class OpenFaceRecognition(object):
         face_list = self.face_detector.detect(rgb_image)
         if len(face_list) == 0:
             print("no image found for extraction")
+            return []
         else:
             self.facial_features_estimator.estimate(rgb_image,face_list,self.frontalize)
             name = self.facial_features_estimator.name
@@ -61,6 +63,7 @@ class FacialRecognitionDataLoader(object):
         print("Start loading the dataset:\r\n'{}'\r\n'{}'".format(train_directory_path, val_directory_path))
         self.X_train, self.Y_train, self.train_classes = self.load_dataset(train_directory_path)
         self.X_val, self.Y_val, self.val_classes = self.load_dataset(val_directory_path)
+        self.knn = None
         print("Training categories ({} different):".format(len(self.train_classes.keys())))
         print("{}\r\n".format(self.train_classes.keys()))
         print("Validation categories ({} different from training):".format(len(self.val_classes.keys())))
@@ -123,10 +126,12 @@ class FacialRecognitionDataLoader(object):
         for N in ways:
             train_accs.append(self.test_recognition(model, N, trials, mode="train", verbose=verbose))
 
-        plt.plot(ways, train_accs, "b", label="")
-        plt.xlabel("Number of possible classes in one-shot tasks")
+        plt.plot(ways, train_accs, "b", label="Distance between feature")
+        plt.plot(ways, 100.0/ways, "g", label="Random guessing")
+
+        plt.xlabel("Number of people")
         plt.ylabel("% Accuracy")
-        plt.title("One-Shot Learning Performance")
+        plt.title("Facial Recognition Performance")
         plt.legend(loc='center left')
         plt.axis([1, N_way, 0, 100])
         plt.show()
@@ -160,6 +165,42 @@ class FacialRecognitionDataLoader(object):
         targets, support_set = shuffle(targets, support_set)
         return X[true_person][ex1], support_set, targets
 
+    def knn_init(self,feature_name, max_distance ,data_directory="", n_neighbors=1, algorithm="ball_tree", weights="distance"):
+        self.knn = KNearestNeighborsAssignement(feature_name, max_distance,data_directory, n_neighbors, algorithm, weights )
+
+    def knn_update(self,model):
+        X = self.X_train.copy()
+        x,y,w,h,n = X.shape
+        X=X.reshape(x*y,w,h,n)
+        Y = self.Y_train
+        persons_list = self.train_classes
+        for (image,person_id) in zip(X,Y):
+            image_feature = model.extract(image).to_array(  )
+            self.knn.update(image_feature,persons_list[person_id[0]])
+    def knn_train(self):
+        self.knn.train()
+
+
+
+    def knn_validation(self, model):
+        X = self.X_val.copy()
+        x,y,w,h,n = X.shape
+        X=X.reshape(x*y,w,h,n)
+        Y = self.Y_val
+        persons_list = self.val_classes
+        count = 0
+        for (image,person_id) in zip(X,Y):
+            image_feature = model.extract(image).to_array(  )
+            bool, value, distance = self.knn.predict(image_feature)
+            if value == persons_list[person_id[0]]:
+                count +=1
+        accuracy = count / (1.0 * len(X))
+        print("The accuracy is "+ str(accuracy))
+        return accuracy
+
+
+
+
 if __name__ == '__main__':
     detector_model = "../../../models/detection/opencv_face_detector_uint8.pb"
     detector_model_txt = "../../../models/detection/opencv_face_detector.pbtxt"
@@ -167,12 +208,22 @@ if __name__ == '__main__':
     #detector_model_test = "../../../models/detection/ssd_mobilenet_v2_coco_2018_03_29.pb"
     detector_config_filename = "../../../config/detection/face_config.yaml"
     face_3d_model_filename = "../../../config/estimation/face_3d_model.npy"
+else:
+    detector_config_filename = "../config/detection/face_config.yaml"
+    face_3d_model_filename = "../config/estimation/face_3d_model.npy"
+    embedding_model_file = "../models/features/nn4.small2.v1.t7"
 
 
-frdl = FacialRecognitionDataLoader("../../../src/uwds3_perception/recognition/snapshots",
-"../../../src/uwds3_perception/recognition/snapshots")
-#frdl.load_dataset("../../../src/uwds3_perception/recognition/snapshots/")
 
-ofd = OpenFaceRecognition(detector_model, detector_model_txt,detector_config_filename)
+#
+# frdl = FacialRecognitionDataLoader("../../../src/uwds3_perception/recognition/snapshots_origin",
+#  "../../../src/uwds3_perception/recognition/snapshots_origin")
+# frdl.load_dataset("../../../src/uwds3_perception/recognition/snapshots/")
+# ofd = OpenFaceRecognition(detector_model, detector_model_txt,detector_config_filename)
+
 #frdl.test_recognition(ofd,4,50)
-frdl.evaluate(ofd,4)
+# frdl.evaluate(ofd,7)
+# frdl.knn_init("visage",0.99)
+# frdl.knn_update(ofd)
+# frdl.knn_train()
+# frdl.knn_validation(ofd)
