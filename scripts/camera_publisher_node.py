@@ -57,7 +57,8 @@ class CameraPublisher(object):
         ok, frame = self.capture.read()
         if ok:
             bgr_image_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
-            bgr_image_msg.header.stamp = rospy.Time()
+            bgr_image_msg.header.stamp = rospy.Time().now()
+            self.camera_info.header = bgr_image_msg.header
             bgr_image_msg.header.frame_id = self.camera_frame_id
             self.camera_publisher.publish(bgr_image_msg)
             self.camera_info_publisher.publish(self.camera_info)

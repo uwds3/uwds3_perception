@@ -5,10 +5,10 @@ import yaml
 from pyuwds3.types.detection import Detection
 
 
-class OpenCVDNNDetector(object):
+class SSDDetector(object):
     """  """
 
-    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.75, swapRB=False):
+    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.6, swapRB=False):
         """  """
         with open(config_file_path, "r") as f:
             self.config = yaml.load(f)
@@ -58,14 +58,13 @@ class OpenCVDNNDetector(object):
                         ymin = 0 if ymin < 0 else ymin
                         xmax = rgb_image.shape[1]-1 if xmax > rgb_image.shape[1]-1 else xmax
                         ymax = rgb_image.shape[0]-1 if ymax > rgb_image.shape[0]-1 else ymax
-                        if xmax - xmin <= 20 or ymax - ymin <= 20:
-                            continue
-                        bbox = [xmin, ymin, xmax, ymax, confidence]
-                        if class_label not in detection_per_class:
-                            detection_per_class[class_label] = []
-                        if class_label not in score_per_class:
-                            score_per_class[class_label] = []
-                        detection_per_class[class_label].append(bbox)
+                        if (xmax - xmin) > 20 and (ymax - ymin) > 20:
+                            bbox = [xmin, ymin, xmax, ymax, confidence]
+                            if class_label not in detection_per_class:
+                                detection_per_class[class_label] = []
+                            if class_label not in score_per_class:
+                                score_per_class[class_label] = []
+                            detection_per_class[class_label].append(bbox)
 
         for class_label, dets in detection_per_class.items():
             filtered_dets = self.non_max_suppression(np.array(dets), self.max_overlap_ratio)

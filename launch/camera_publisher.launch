@@ -3,10 +3,7 @@
 
   <arg name="camera_info_topic" default="xtion/depth/camera_info"/>
   <arg name="rgb_image_topic" default="xtion/rgb/image_rect_color"/>
-
   <arg name="camera_frame_id" default="optical_frame_camera_link"/>
-  <arg name="global_frame_id" default="odom"/>
-
   <arg name="camera_pub_frequency" default="20.0"/>
 
   <node name="camera_publisher" pkg="uwds3_perception" type="camera_publisher_node.py" args="" output="screen" respawn="false">

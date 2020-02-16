@@ -5,8 +5,11 @@ import uuid
 import uwds3_msgs
 import rospy
 from tf.transformations import euler_matrix
+from .single_object_tracker import SingleObjectTracker
+from pyuwds3.types.scene_node import SceneNode
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
+from pyuwds3.types.vector.vector6d import Vector6D
 from pyuwds3.types.vector.vector6d_stable import Vector6DStable
 
 
@@ -18,17 +21,14 @@ class TrackState:
     DELETED = 4
 
 
-class Track(object):
+class Track(SceneNode):
     """Represents a track in both image and world space"""
 
     def __init__(self,
-                 rgb_image,
                  detection,
                  n_init,
                  max_disappeared,
-                 max_age,
-                 similarity_metric,
-                 max_dist):
+                 max_age):
         """Track constructor"""
 
         self.n_init = n_init
@@ -38,7 +38,7 @@ class Track(object):
         self.hits = 1
         self.age = 1
 
-        self.uuid = str(uuid.uuid4()).replace("-", "")
+        self.id = str(uuid.uuid4()).replace("-", "")
 
         self.bbox = BoundingBoxStable(detection.bbox.xmin,
                                       detection.bbox.ymin,
@@ -55,12 +55,16 @@ class Track(object):
         self.pose = None
         self.shape = None
 
+        self.tracker = SingleObjectTracker()
+
         if self.label == "face":
             self.camera = HumanCamera()
         else:
             self.camera = None
 
         self.features = detection.features
+
+        self.expiration_duration = 1.0
 
     def update(self, detection):
         """Updates the track's bbox"""
@@ -79,6 +83,7 @@ class Track(object):
             self.state = TrackState.CONFIRMED
 
     def update_pose(self, position, rotation=None):
+        """ """
         if self.pose is None:
             if rotation is None:
                 self.pose = Vector6DStable(x=position.x,
@@ -135,15 +140,6 @@ class Track(object):
     def is_tentative(self):
         return self.state == TrackState.TENTATIVE
 
-    def is_located(self):
-        return self.pose is not None
-
-    def has_shape(self):
-        return self.shape is not None
-
-    def has_camera(self):
-        return self.camera is not None
-
     # def project_into(self, camera_track):
     #     """Returns the 2D bbox in the given camera plane"""
     #     if self.is_located() and camera_track.is_located():
@@ -182,84 +178,3 @@ class Track(object):
     #                 ymax = camera_track.camera.height
     #             return True, BoundingBox(xmin, ymin, xmax, ymax)
     #     return False, None
-
-    def draw(self, image, color, thickness, camera_matrix, dist_coeffs):
-        """Draws the track"""
-        if self.is_confirmed():
-            track_color = (0, 200, 0, 0)
-            text_color = (50, 50, 50)
-        else:
-            if self.is_occluded():
-                track_color = (0, 0, 200, 0.3)
-                text_color = (250, 250, 250)
-            else:
-                track_color = (200, 0, 0, 0.3)
-                text_color = (250, 250, 250)
-
-        if self.is_confirmed():
-            if self.is_located() and self.is_confirmed():
-                rot = self.pose.rotation().to_array()
-                # for opencv convention
-                R = euler_matrix(rot[0][0], rot[1][0], rot[2][0], "rxyz")
-                rvec = cv2.Rodrigues(R[:3, :3])[0]
-                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs,
-                                  rvec,
-                                  self.pose.position().to_array(), 0.1)
-            cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-20),
-                                 (self.bbox.xmax, self.bbox.ymax),
-                                 (200, 200, 200), -1)
-            self.bbox.draw(image, track_color, 2)
-            self.bbox.draw(image, text_color, 1)
-
-            cv2.putText(image,
-                        "{}".format(self.uuid[:6]),
-                        (self.bbox.xmax-60, self.bbox.ymax-8),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        text_color,
-                        1)
-            cv2.putText(image,
-                        self.label,
-                        (self.bbox.xmin+5, self.bbox.ymax-8),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, text_color, 1)
-            if "facial_landmarks" in self.features:
-                self.features["facial_landmarks"].draw(image,
-                                                       track_color,
-                                                       thickness)
-        else:
-            self.bbox.draw(image, track_color, 1)
-
-    def to_msg(self, header, expiration_duration=1.0):
-        """Converts into a ROS message"""
-        msg = uwds3_msgs.msg.SceneNode()
-        msg.id = self.label+"_"+self.uuid
-        msg.label = self.label
-
-        if self.is_located():
-            msg.is_located = True
-            q = self.pose.quaternion()
-            msg.pose_stamped.header = header
-            msg.pose_stamped.pose.pose.position.x = self.pose.position().x
-            msg.pose_stamped.pose.pose.position.y = self.pose.position().y
-            msg.pose_stamped.pose.pose.position.z = self.pose.position().z
-            msg.pose_stamped.pose.pose.orientation.x = q[0]
-            msg.pose_stamped.pose.pose.orientation.y = q[1]
-            msg.pose_stamped.pose.pose.orientation.z = q[2]
-            msg.pose_stamped.pose.pose.orientation.w = q[3]
-
-        for features in self.features.values():
-            msg.features.append(features.to_msg())
-
-        if self.has_camera():
-            msg.has_camera = True
-            msg.camera.info.header = header
-            msg.camera.info.header.frame_id = msg.id
-            msg.camera = self.camera.to_msg()
-
-        if self.has_shape():
-            msg.shape = self.shape.to_msg()
-
-        msg.last_update = header.stamp
-        msg.expiration_duration = rospy.Duration(expiration_duration)
-        return msg

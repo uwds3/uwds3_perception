@@ -1,12 +1,11 @@
-numpy>=1.11.1
-scipy>=0.14
+numpy>=1.11.0
+scipy>=0.1
 uuid
+pyyaml
 argparse
 scikit-image
 scikit-learn
 matplotlib
 dlib
-face-alignment
-torch>=1.1
 opencv-python
 opencv-contrib-python

@@ -3,10 +3,13 @@
 
 import rospy
 import numpy as np
+from tf.transformations import translation_matrix, quaternion_matrix
+from tf.transformations import translation_from_matrix, quaternion_from_matrix
 from visualization_msgs.msg import Marker, MarkerArray
-from uwds3_msgs.msg import SceneNode, PrimitiveShape, SceneNodeArrayStamped
+from uwds3_msgs.msg import SceneNode, PrimitiveShape, SceneChangesStamped
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import ColorRGBA
+
 
 class ShapeVisualizerNode(object):
     def __init__(self):
@@ -14,20 +17,14 @@ class ShapeVisualizerNode(object):
         self.marker_id_map = {}
         self.tracks = {}
         self.track_marker = {}
-        self.track_color = {}
         self.last_marker_id = 0
         self.markers_publisher = rospy.Publisher(self.tracks_topic+"_viz", MarkerArray, queue_size=1)
-        self.track_subscriber = rospy.Subscriber(self.tracks_topic, SceneNodeArrayStamped, self.observation_callback, queue_size=1)
+        self.track_subscriber = rospy.Subscriber(self.tracks_topic, SceneChangesStamped, self.observation_callback, queue_size=1)
         rospy.loginfo("[visualizer] Shape visualizer ready !")
 
     def observation_callback(self, tracks_msg):
         markers_msg = MarkerArray()
-        perceived_tracks = []
-        for track in tracks_msg.nodes:
-            if track.id in perceived_tracks:
-                rospy.logwarn("[visualizer] Error occured: Shape for node <{}> already created".format(track.id))
-                continue
-            perceived_tracks.append(track.id)
+        for track in tracks_msg.changes.nodes:
             if track.has_shape is True:
                 if track.id in self.track_marker:
                     marker = self.track_marker[track.id]
@@ -36,44 +33,71 @@ class ShapeVisualizerNode(object):
                     marker = Marker()
                     self.last_marker_id += 1
                     marker.id = self.last_marker_id
+                    marker.ns = track.id
                     marker.action = Marker.ADD
-                    frame = track.id
-                    marker.header.frame_id = frame
-                    self.track_marker[track.id] = marker
+                    marker.header = tracks_msg.header
+
                 marker.header.stamp = tracks_msg.header.stamp
+
+                position = [track.pose_stamped.pose.pose.position.x,
+                            track.pose_stamped.pose.pose.position.y,
+                            track.pose_stamped.pose.pose.position.z]
+                orientation = [track.pose_stamped.pose.pose.orientation.x,
+                               track.pose_stamped.pose.pose.orientation.y,
+                               track.pose_stamped.pose.pose.orientation.z,
+                               track.pose_stamped.pose.pose.orientation.w]
+                world_transform = np.dot(translation_matrix(position), quaternion_matrix(orientation))
+                position = [track.shape.pose.position.x,
+                            track.shape.pose.position.y,
+                            track.shape.pose.position.z]
+                orientation = [track.shape.pose.orientation.x,
+                               track.shape.pose.orientation.y,
+                               track.shape.pose.orientation.z,
+                               track.shape.pose.orientation.w]
+                shape_transform = np.dot(translation_matrix(position), quaternion_matrix(orientation))
+                shape_world_transform = np.dot(world_transform, shape_transform)
+                position = translation_from_matrix(shape_world_transform)
+                orientation = quaternion_from_matrix(shape_world_transform)
+
+                marker.pose.position.x = position[0]
+                marker.pose.position.y = position[1]
+                marker.pose.position.z = position[2]
+
+                marker.pose.orientation.x = orientation[0]
+                marker.pose.orientation.y = orientation[1]
+                marker.pose.orientation.z = orientation[2]
+                marker.pose.orientation.w = orientation[3]
 
                 if track.shape.type == PrimitiveShape.CYLINDER:
                     marker.type = Marker.CYLINDER
-                elif track.shape.type == PrimitiveShape.BBOX3D:
-                    marker.type = Marker.CUBE
-                if track.label == "face":
-                    marker.scale = Vector3(x=track.shape.dimensions[0],
-                                           y=track.shape.dimensions[1],
+                    marker.scale = Vector3(x=track.shape.dimensions[1]*2.0,
+                                           y=track.shape.dimensions[1]*2.0,
                                            z=track.shape.dimensions[0])
-                else:
+                elif track.shape.type == PrimitiveShape.SPHERE:
+                    marker.type = Marker.SPHERE
+                    marker.scale = Vector3(x=track.shape.dimensions[0]*2.0,
+                                           y=track.shape.dimensions[0]*2.0,
+                                           z=track.shape.dimensions[0]*2.0)
+                elif track.shape.type == PrimitiveShape.BOX:
+                    marker.type = Marker.CUBE
                     marker.scale = Vector3(x=track.shape.dimensions[0],
                                            y=track.shape.dimensions[1],
                                            z=track.shape.dimensions[2])
-                if track.id in self.track_color:
-                    color = self.track_color[track.id]
+                elif track.shape.type == PrimitiveShape.MESH:
+                    if track.shape.mesh_resource != "":
+                        marker.type = Marker.MESH_RESOURCE
+                        marker.mesh_resource = track.shape.mesh_resource
+                        marker.mesh_use_embedded_materials = True
+                    else:
+                        marker.type = Marker.TRIANGLE_LIST
+                        marker.points = track.shape.vertices
+                    marker.scale = Vector3(x=1.0, y=1.0, z=1.0)
                 else:
-                    color = ColorRGBA()
-                    color.a = 0.65
-                    color.r = np.random.random_sample()
-                    color.g = np.random.random_sample()
-                    color.b = np.random.random_sample()
-                    self.track_color[track.id] = color
-                marker.color = color
-                marker.pose = track.shape.pose
+                    raise NotImplementedError("Shape not implemented")
+                marker.color.a = 1.0
+                marker.lifetime = rospy.Duration(1.0)
                 self.track_marker[track.id] = marker
                 markers_msg.markers.append(marker)
-            if track.has_camera is True:
-                pass
-        for track_id in self.track_marker.keys():
-            if track_id not in perceived_tracks:
-                self.track_marker[track_id].action = Marker.DELETE
-                markers_msg.markers.append(self.track_marker[track_id])
-                del self.track_marker[track_id]
         self.markers_publisher.publish(markers_msg)
 
     def run(self):

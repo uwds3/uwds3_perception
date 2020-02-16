@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+  <arg name="camera_info_topic" default="xtion/depth/camera_info"/>
+  <arg name="rgb_image_topic" default="xtion/rgb/image_rect_color"/>
+  <arg name="global_frame_id" default="map"/>
+  <arg name="camera_frame_id" default="optical_frame_camera_link"/>
+  <arg name="ar_tags_config" default="$(find adream_simulation)/config/ar_tags/ar_tags_config.yaml"/>
+  <arg name="resource_directory" default="$(find adream_simulation)/models/cad_models/"/>
+
+  <arg name="marker_size" default="4.7"/>
+  <arg name="max_new_marker_error" default="0.08" />
+  <arg name="max_track_error" default="0.5"/>
+  <arg name="bundle_files" default="$(find adream_simulation)/models/ar_tags/blue_bin.xml $(find adream_simulation)/models/ar_tags/green_bin.xml"/>
+
+  <node name="ar_objects_perception" pkg="uwds3_perception" type="ar_objects_perception_node.py" args="" output="screen" respawn="false">
+    <rosparam subst_value="true">
+      global_frame_id: $(arg global_frame_id)
+      camera_info_topic: $(arg camera_info_topic)
+      ar_tags_config: $(arg ar_tags_config)
+      resource_directory: $(arg resource_directory)
+    </rosparam>
+  </node>
+
+  <node name="ar_track_alvar" pkg="ar_track_alvar" type="findMarkerBundlesNoKinect" respawn="false" output="screen" args="$(arg marker_size) $(arg max_new_marker_error) $(arg max_track_error) $(arg rgb_image_topic) $(arg camera_info_topic) $(arg camera_frame_id) $(arg bundle_files)" />
+
+</launch>
