@@ -19,11 +19,11 @@ class FacialFeaturesEstimator(object):
         """Extracts the facial description features"""
         cropped_imgs = []
         for f in faces:
-            x = int(f.bbox.center().x)
-            y = int(f.bbox.center().y)
+            xmin = int(f.bbox.xmin)
+            ymin = int(f.bbox.ymin)
             w = int(f.bbox.width())
             h = int(f.bbox.height())
-            cropped_imgs.append(rgb_image[y:y+h, x:x+w])
+            cropped_imgs.append(rgb_image[ymin:ymin+h, xmin:xmin+w])
             if self.frontalizer is not None:
                 frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
                 cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))

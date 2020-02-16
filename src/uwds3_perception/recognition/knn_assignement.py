@@ -4,7 +4,7 @@
 import math
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-
+import pickle
 
 class KNearestNeighborsAssignement(object):
     """   """
@@ -69,6 +69,14 @@ class KNearestNeighborsAssignement(object):
         """
         pass
         # TODO: save data
+    def save(self,file):
+        file = open(file,'w')
+        pickle.dump(self.knn,file)
+        file.close()
+    def load(self,file):
+        file = open(file,'r')
+        self.knn = pickle.load(file)
+        file.close()
 
 if __name__ == '__main__':
     knn = KNearestNeighborsAssignement("test_face", 0.53)

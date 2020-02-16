@@ -42,25 +42,25 @@ class FacialLandmarksEstimator(object):
         detections = []
         for f in faces:
             if hasattr(f, "pose") is True:
-                if f.pose is not None:
-                    if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
-                        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-                        shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))
-                        coords = np.zeros((68, 2), dtype=np.float32)
-                        for i in range(0, 68):
-                            coords[i] = (shape.part(i).x, shape.part(i).y)
-                        f.features[self.name] = FacialLandmarks(coords, image_width, image_height)
-                        continue
-            det_with_conf = np.zeros((5,), dtype=np.float32)
-            det_with_conf[:4] = f.bbox.to_xyxy().flatten()[:4]
-            det_with_conf[4] = 1.0
-            detections.append(det_with_conf)
-
-        if len(detections) > 0:
-            preds = self.fan_predictor.get_landmarks(rgb_image, detections)
-            if preds is not None:
-                if len(preds) > 0:
-                    for f, landmarks in zip(faces, preds):
-                        succes = self.__check_consistency(f, landmarks)
-                        if succes is True:
-                            f.features[self.name] = FacialLandmarks(landmarks, image_width, image_height)
+                #if f.pose is not None:
+                    #if self.__is_facing(f.pose.rot.x, f.pose.rot.y, f.pose.rot.z) is True:
+                gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+                shape = self.dlib_predictor(gray, dlib.rectangle(int(f.bbox.xmin), int(f.bbox.ymin), int(f.bbox.xmax), int(f.bbox.ymax)))
+                coords = np.zeros((68, 2), dtype=np.float32)
+                for i in range(0, 68):
+                    coords[i] = (shape.part(i).x, shape.part(i).y)
+                f.features[self.name] = FacialLandmarks(coords, image_width, image_height)
+        #                 continue
+        #     det_with_conf = np.zeros((5,), dtype=np.float32)
+        #     det_with_conf[:4] = f.bbox.to_xyxy().flatten()[:4]
+        #     det_with_conf[4] = 1.0
+        #     detections.append(det_with_conf)
+        #
+        # if len(detections) > 0:
+        #     preds = self.fan_predictor.get_landmarks(rgb_image, detections)
+        #     if preds is not None:
+        #         if len(preds) > 0:
+        #             for f, landmarks in zip(faces, preds):
+        #                 succes = self.__check_consistency(f, landmarks)
+        #                 if succes is True:
+        #                     f.features[self.name] = FacialLandmarks(landmarks, image_width, image_height)
