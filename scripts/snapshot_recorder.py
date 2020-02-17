@@ -7,9 +7,9 @@ from uwds3_perception.detection.opencv_dnn_detector import OpenCVDNNDetector
 from uwds3_perception.recognition.knn_assignement import KNearestNeighborsAssignement
 from uwds3_perception.recognition.facial_recognition import OpenFaceRecognition
 import pickle
-file = open("../src/uwds3_perception/recognition/test_knn",'r')
-knn = pickle.load(file)
-file.close()
+# file = open("../src/uwds3_perception/recognition/test_knn",'r')
+# knn = pickle.load(file)
+# file.close()
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Record RGB snapshots for machine learning")
     parser.add_argument('label', type=str, help='The label used to name the data directory')
