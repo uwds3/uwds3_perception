@@ -25,10 +25,11 @@ class FacialFeaturesEstimator(object):
                 ymin = int(f.bbox.ymin)
                 w = int(f.bbox.width())
                 h = int(f.bbox.height())
-                cropped_imgs.append(rgb_image[ymin:ymin+h, xmin:xmin+w])
-                if self.frontalizer is not None:
-                    frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
-                    cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))
+                if w > 27 and h > 27:
+                    cropped_imgs.append(rgb_image[ymin:ymin+h, xmin:xmin+w])
+                    if self.frontalizer is not None:
+                        frontalized_img = self.frontalizer.estimate(rgb_image, f, camera_matrix, dist_coeffs)
+                        cropped_imgs.append(np.round(frontalized_img).astype(np.uint8))
         if len(cropped_imgs) > 0:
             blob = cv2.dnn.blobFromImages(cropped_imgs,
                                           1.0 / 255,

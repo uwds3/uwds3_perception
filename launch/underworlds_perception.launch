@@ -19,10 +19,6 @@
   <arg name="face_detector_weights_filename" default="$(find uwds3_perception)/models/detection/opencv_face_detector.pbtxt"/>
   <arg name="face_detector_config_filename" default="$(find uwds3_perception)/config/detection/face_config.yaml"/>
 
-  <!-- Retina filter parameters -->
-  <arg name="use_retina_filter" default="false"/>
-  <arg name="retina_filter_config_filename" default="$(find uwds3_perception)/config/preprocessing/retina.xml"/>
-
   <!-- Head pose estimation parameters -->
   <arg name="shape_predictor_config_filename" default="$(find uwds3_perception)/models/estimation/shape_predictor_68_face_landmarks.dat"/>
   <arg name="face_3d_model_filename" default="$(find uwds3_perception)/config/estimation/face_3d_model.npy"/>
@@ -31,6 +27,7 @@
 
   <!-- Tracker parameters -->
   <arg name="n_init" default="4"/>
+  <arg name="n_frame" default="2"/>
   <arg name="max_iou_distance" default="0.98"/>
   <arg name="max_color_distance" default="0.4"/>
   <arg name="max_face_distance" default="0.3"/>
@@ -42,7 +39,7 @@
   <arg name="publish_visualization_image" default="true"/>
   <arg name="publish_tf" default="true"/>
   <arg name="use_depth" default="false"/>
-  <arg name="n_frame" default="2"/>
+
 
   <node name="uwds3_perception" pkg="uwds3_perception" type="uwds3_perception_node.py" args="" output="screen" respawn="false">
     <rosparam subst_value="true">
