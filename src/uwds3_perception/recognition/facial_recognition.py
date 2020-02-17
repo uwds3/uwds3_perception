@@ -20,10 +20,10 @@ from keras import backend as K
 import pickle
 
 class FacialRecognition(object):
-    def __init__(self,knn_model_filename):
+    def __init__(self, knn_model_filename):
         loader = KNNLoader()
         self.knn = loader.load(knn_name)
-    def recognize(self,face_tracks):
+    def recognize(self, face_tracks):
         for track in face_tracks:
             _,track.description,_ = self.knn.predict(track.features["facial_description"].to_array())
 
