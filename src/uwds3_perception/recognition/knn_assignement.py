@@ -78,6 +78,12 @@ class KNearestNeighborsAssignement(object):
         self.knn = pickle.load(file)
         file.close()
 
+class KNNLoader(object):
+    def load(self,file):
+        file = open(file,'r')
+        knn = pickle.load(file)
+        file.close()
+        return knn
 if __name__ == '__main__':
     knn = KNearestNeighborsAssignement("test_face", 0.53)
     print("Add samples to KNN")

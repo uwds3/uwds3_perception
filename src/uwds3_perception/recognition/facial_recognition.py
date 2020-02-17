@@ -7,6 +7,7 @@ from uwds3_perception.detection.opencv_dnn_detector import OpenCVDNNDetector
 from uwds3_perception.estimation.facial_features_estimator import FacialFeaturesEstimator
 from uwds3_perception.detection.face_detector import FaceDetector
 from uwds3_perception.recognition.knn_assignement import KNearestNeighborsAssignement
+from uwds3_perception.recognition.knn_assignement import KNNLoader
 from pyuwds3.types.features import Features
 import numpy.random as rng
 import time
@@ -16,11 +17,16 @@ from keras.regularizers import l2
 from keras.optimizers import Adam
 from sklearn.utils import shuffle
 from keras import backend as K
+import pickle
 
+class FacialRecognition(object):
+    def __init__(self,knn_model_filename):
+        loader = KNNLoader()
+        self.knn = loader.load(knn_name)
+    def recognize(self,face_tracks):
+        for track in face_tracks:
+            _,track.description,_ = self.knn.predict(track.features["facial_description"].to_array())
 
-# class FacialRecognition():
-#     Track +id -> id/knn
-# dans description de track
 
 
 class OpenFaceRecognition(object):
