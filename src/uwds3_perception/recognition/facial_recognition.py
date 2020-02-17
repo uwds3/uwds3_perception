@@ -17,6 +17,12 @@ from keras.optimizers import Adam
 from sklearn.utils import shuffle
 from keras import backend as K
 
+
+# class FacialRecognition():
+#     Track +id -> id/knn
+# dans description de track
+
+
 class OpenFaceRecognition(object):
     def __init__(self,
                  #input_shape,

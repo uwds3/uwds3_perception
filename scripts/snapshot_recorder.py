@@ -42,7 +42,8 @@ if __name__ == '__main__':
             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             face_list = face_detector.detect(rgb_image)
             if len(face_list)>0:
-                _,a,_  = knn.predict(model.extract(rgb_image).to_array())
+                _,a,score  = knn.predict(model.extract(rgb_image).to_array())
+                face_list[0].confidence = score[0]
                 face_list[0].label += " " + a
                 color = (0,230,0)
                 if a != "alexandre":
