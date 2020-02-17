@@ -1,5 +1,5 @@
 import cv2
-import math
+from math import pi
 import numpy as np
 from tf.transformations import euler_matrix, euler_from_matrix, is_same_transform
 from pyuwds3.types.vector.vector6d import Vector6D
@@ -7,8 +7,12 @@ from pyuwds3.types.vector.vector3d import Vector3D
 
 MAX_DIST = 2.5
 
-RX_OFFSET = - math.pi/2.0
-RY_OFFSET = math.pi
+RX_OFFSET = 0.0
+RY_OFFSET = 0.0
+RZ_OFFSET = 0.0
+
+RX_OFFSET = - pi/2.0
+RY_OFFSET = pi
 RZ_OFFSET = 0.0
 
 
@@ -16,6 +20,7 @@ class HeadPoseEstimator(object):
     def __init__(self, face_3d_model_filename):
         """HeadPoseEstimator constructor"""
         self.model_3d = np.load(face_3d_model_filename)/100.0/4.6889/2.0
+        self.offset = Vector6D(rx=RX_OFFSET, ry=RY_OFFSET, rz=RZ_OFFSET).transform()
 
     def __check_consistency(self, tvec, rvec):
         consistent = True
@@ -33,11 +38,12 @@ class HeadPoseEstimator(object):
         T = np.zeros((4, 4))
         T[3, 3] = 1.0
         euler = np.array(euler_from_matrix(R, "sxyz"))
-        euler[2] *= -1
+        euler[2] = 0
         return euler.reshape((3, 1))
 
     def __euler2rodrigues(self, rot):
-        R = euler_matrix(rot[0][0], rot[1][0], -rot[2][0], "sxyz")
+        rot[2][0] = 0
+        R = euler_matrix(rot[0][0], rot[1][0], rot[2][0], "sxyz")
         rvec = cv2.Rodrigues(R[:3, :3])[0]
         return rvec
 
@@ -49,7 +55,7 @@ class HeadPoseEstimator(object):
                     points_2d = f.features["facial_landmarks"].data
                     if f.pose is not None:
                         world_transform = f.pose.transform()
-                        sensor_pose = Vector6D().from_transform(np.dot(np.linalg.inv(world_transform), world_transform))
+                        sensor_pose = Vector6D().from_transform(np.dot(np.dot(np.linalg.inv(world_transform), world_transform), np.linalg.inv(self.offset)))
                         r = sensor_pose.rotation().to_array()
                         t = sensor_pose.position().to_array()
                         self.__add_offset(r, -RX_OFFSET, -RY_OFFSET, -RZ_OFFSET)
@@ -57,12 +63,14 @@ class HeadPoseEstimator(object):
                         success, rvec, tvec, _ = cv2.solvePnPRansac(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE, useExtrinsicGuess=True, rvec=rvec, tvec=t)
                         success = self.__check_consistency(tvec, rvec)
                     else:
-                        success, rvec, tvec, _ = cv2.solvePnPRansac(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
+                        success, rvec, tvec = cv2.solvePnP(self.model_3d, points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
                         success = self.__check_consistency(tvec, rvec)
                     if success:
                         r = self.__rodrigues2euler(rvec)
+                        print r
                         self.__add_offset(r, RX_OFFSET, RY_OFFSET, RZ_OFFSET)
                         sensor_pose = Vector6D(x=tvec[0][0], y=tvec[1][0], z=tvec[2][0],
-                                               rx=r[0][0], ry=r[1][0], rz=.0)#r[2][0])
+                                               rx=r[0][0], ry=abs(r[1][0]), rz=r[2][0])
                         world_pose = Vector6D().from_transform(np.dot(view_matrix, sensor_pose.transform()))
+                        print world_pose.rot
                         f.update_pose(world_pose.position(), rotation=world_pose.rotation())
