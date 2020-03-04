@@ -1,7 +1,10 @@
 import cv2
 import math
 import numpy as np
+import rospy
 from pyuwds3.types.detection import Detection
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 
 class DetectorState(object):
@@ -18,7 +21,7 @@ class ForegroundDetector(object):
         self.interactive_mode = interactive_mode
         self.roi_points = []
         self.state = DetectorState.INIT
-        self.background_substraction = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=150, detectShadows=True)
+        self.background_substraction = cv2.createBackgroundSubtractorMOG2(history=200, varThreshold=130, detectShadows=True)
 
         if self.interactive_mode is True:
             cv2.namedWindow("select_roi")
@@ -26,17 +29,21 @@ class ForegroundDetector(object):
         else:
             self.state = DetectorState.RUNNING
 
+        self.bridge = CvBridge()
+        self.pub = rospy.Publisher("test", Image, queue_size=1)
+
     def detect(self, rgb_image, depth_image=None, roi_points=[], prior_detections=[]):
         filtered_bbox = []
         output_dets = []
 
+        h, w, _ = rgb_image.shape
+        foreground_mask = np.zeros((h, w), dtype=np.uint8)
+
         bgr_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
-        foreground_mask = self.background_substraction.apply(bgr_image, learningRate=10e-8)
+        foreground_mask[int(h/2.0):h, 0:int(w)] = self.background_substraction.apply(bgr_image[int(h/2.0):h, 0:int(w)], learningRate=10e-7)
         foreground_mask[foreground_mask != 255] = 0 # shadows suppression
 
-        if self.interactive_mode is False:
-            h, w, _ = rgb_image.shape
-            foreground_mask[0:int(h/2.0), 0:int(w)] = 0
+        self.pub.publish(self.bridge.cv2_to_imgmsg(foreground_mask))
 
         for d in prior_detections:
             x = int(d.bbox.xmin)
@@ -90,15 +97,15 @@ class ForegroundDetector(object):
                 self.state = DetectorState.RUNNING
 
         if self.state == DetectorState.RUNNING:
-            filtered_bbox = self.non_max_suppression(np.array(filtered_bbox), 0.7)
+            filtered_bbox = self.non_max_suppression(np.array(filtered_bbox), 0.5)
 
             for bbox in filtered_bbox:
                 xmin, ymin, xmax, ymax = bbox
+                w = int(xmax - xmin)
+                h = int(ymax - ymin)
+                x = int(xmin + w/2.0)
+                y = int(ymin + h/2.0)
                 if depth_image is not None:
-                    w = xmax - xmin
-                    h = ymax - ymin
-                    x = xmin + w/2.0
-                    y = ymin + h/2.0
                     x = depth_image.shape[1]-1 if x > depth_image.shape[1] else x
                     y = depth_image.shape[0]-1 if y > depth_image.shape[0] else y
                     depth = depth_image[int(y)][int(x)]/1000.0
@@ -106,7 +113,8 @@ class ForegroundDetector(object):
                         depth = None
                 else:
                     depth = None
-                output_dets.append(Detection(xmin, ymin, xmax, ymax, "thing", 0.4, depth=depth))
+                mask = opening[int(ymin):int(ymax), int(xmin):int(xmax)]
+                output_dets.append(Detection(int(xmin), int(ymin), int(xmax), int(ymax), "thing", 0.4, mask=mask, depth=depth))
 
             return output_dets
         else:

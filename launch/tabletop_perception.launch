@@ -26,13 +26,13 @@
   <arg name="facial_features_model_filename" default="$(find uwds3_perception)/models/features/nn4.small2.v1.t7"/>
 
   <!-- Tracker parameters -->
-  <arg name="n_init" default="4"/>
+  <arg name="n_init" default="10"/>
   <arg name="n_frame" default="3"/>
-  <arg name="max_iou_distance" default="0.98"/>
-  <arg name="max_color_distance" default="0.3"/>
-  <arg name="max_face_distance" default="0.3"/>
+  <arg name="max_iou_distance" default="0.4"/>
+  <arg name="max_color_distance" default="0.4"/>
+  <arg name="max_face_distance" default="0.4"/>
   <arg name="max_centroid_distance" default="0.4"/>
-  <arg name="max_disappeared" default="3"/>
+  <arg name="max_disappeared" default="8"/>
   <arg name="max_age" default="10"/>
 
   <!-- Other parameters -->

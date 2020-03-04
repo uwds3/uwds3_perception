@@ -84,7 +84,7 @@ class TabletopPerception(object):
 
         self.n_init = rospy.get_param("~n_init", 1)
         self.max_iou_distance = rospy.get_param("~max_iou_distance", 0.8)
-        self.max_color_distance = rospy.get_param("~max_color_distance", 0.8)
+        self.max_color_distance = rospy.get_param("~max_color_distance", 0.2)
         self.max_face_distance = rospy.get_param("~max_face_distance", 0.8)
         self.max_centroid_distance = rospy.get_param("~max_centroid_distance", 0.8)
         self.max_disappeared = rospy.get_param("~max_disappeared", 7)
@@ -92,12 +92,12 @@ class TabletopPerception(object):
 
         self.object_tracker = MultiObjectTracker(iou_cost,
                                                  color_cost,
-                                                 0.7,
+                                                 self.max_iou_distance,
                                                  self.max_color_distance,
-                                                 10,
-                                                 5,
+                                                 self.n_init,
+                                                 self.max_disappeared,
                                                  self.max_age,
-                                                 use_appearance_tracker=True)
+                                                 use_appearance_tracker=False)
 
         self.face_tracker = MultiObjectTracker(iou_cost,
                                                centroid_cost,
@@ -115,7 +115,7 @@ class TabletopPerception(object):
                                                  self.n_init,
                                                  self.max_disappeared,
                                                  self.max_age,
-                                                 use_appearance_tracker=False)
+                                                 use_appearance_tracker=True)
 
         self.shape_estimator = ShapeEstimator()
 
@@ -183,8 +183,10 @@ class TabletopPerception(object):
                     detections += object_detections
                 elif self.frame_count == 1:
                     detections = self.face_detector.detect(rgb_image, depth_image=depth_image)
+                    #object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image)
+                    #detections += object_detections
                 else:
-                    detections = []
+                    object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image, prior_detections=detections)
 
                 ####################################################################
                 # Features estimation
@@ -248,6 +250,8 @@ class TabletopPerception(object):
                 header = bgr_image_msg.header
                 header.frame_id = self.global_frame_id
                 scene_changes.header = header
+
+                cv2.line(viz_frame, (0, image_height/2), (image_width, image_height/2), (0, 255, 0), 1)
 
                 for track in tracks:
                     if self.publish_visualization_image is True:

@@ -5,7 +5,8 @@ import uuid
 import uwds3_msgs
 import rospy
 from tf.transformations import euler_matrix
-from .single_object_tracker import SingleObjectTracker
+from .single_object_trackers.medianflow_tracker import MedianflowTracker
+from .single_object_trackers.camshift_tracker import CamshiftTracker
 from pyuwds3.types.scene_node import SceneNode
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
@@ -54,9 +55,11 @@ class Track(SceneNode):
 
         self.pose = None
 
+        self.mask = None
+
         self.shapes = []
 
-        self.tracker = SingleObjectTracker()
+        self.tracker = MedianflowTracker()
 
         if self.label == "face":
             self.camera = HumanCamera()
@@ -74,6 +77,22 @@ class Track(SceneNode):
                          detection.bbox.xmax,
                          detection.bbox.ymax,
                          depth=detection.bbox.depth)
+        w = self.bbox.width()
+        h = self.bbox.height()
+        # xmax_mask = max(detection.bbox.xmax, self.bbox.xmax)
+        # ymax_mask = max(detection.bbox.ymax, self.bbox.ymax)
+        # self.mask = np.zeros((ymax_mask, xmax_mask))
+        # h_det = detection.mask.shape[0]
+        # w_det = detection.mask.shape[1]
+        # h_diff = abs(h - h_det)
+        # w_diff = abs(w - w_det)
+        # if h > h_det and w > w_det:
+        #     w_offset = w_diff/2
+        #     h_offset = h_diff/2
+        #     self.mask[h_offset:h-h_offset, w_offset:w-w_offset] = detection.mask
+        # elif h < h_det and
+        #
+        # self.mask[] = mask
         for name, features in detection.features.items():
             self.features[name] = features
         self.age = 0
@@ -140,6 +159,74 @@ class Track(SceneNode):
 
     def is_tentative(self):
         return self.state == TrackState.TENTATIVE
+
+    def draw(self, image, color, thickness=1, view_matrix=None, camera_matrix=None, dist_coeffs=None):
+        """Draws the track"""
+        if self.is_confirmed():
+            track_color = (0, 200, 0, 0)
+            text_color = (50, 50, 50)
+        else:
+            if self.is_occluded():
+                track_color = (0, 0, 200, 0.3)
+                text_color = (250, 250, 250)
+            else:
+                track_color = (200, 0, 0, 0.3)
+                text_color = (250, 250, 250)
+
+        if self.is_confirmed():
+            if self.is_located() and self.is_confirmed():
+                if view_matrix is not None and \
+                    camera_matrix is not None and \
+                        dist_coeffs is not None:
+                    sensor_pose = Vector6D().from_transform(np.dot(np.linalg.inv(view_matrix), self.pose.transform()))
+                    rot = sensor_pose.rotation().to_array()
+                    depth = sensor_pose.position().z
+                    # for opencv convention
+                    R = euler_matrix(rot[0][0], rot[1][0], rot[2][0], "rxyz")
+                    rvec = cv2.Rodrigues(R[:3, :3])[0]
+                    cv2.putText(image, "{0:.3}m".format(depth),
+                                (self.bbox.xmin+5, self.bbox.ymin-5),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                .6,
+                                (255, 255, 255),
+                                2)
+                    cv2.drawFrameAxes(image, camera_matrix, dist_coeffs,
+                                      rvec,
+                                      sensor_pose.position().to_array(), 0.1)
+            cv2.rectangle(image, (self.bbox.xmin, self.bbox.ymax-26),
+                                 (self.bbox.xmax, self.bbox.ymax),
+                                 (200, 200, 200), -1)
+            # if self.mask is not None:
+            #     mask = np.full((image.shape[0], image.shape[1], 1), 255)
+            #     xmin = int(self.bbox.xmin)
+            #     ymin = int(self.bbox.ymin)
+            #     xmax = int(self.bbox.xmax)
+            #     ymax = int(self.bbox.ymax)
+            #     mask[ymin:ymax, xmin:xmax] = self.mask
+            #     contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            #     cv2.drawContours(image, contours, 0, track_color, thickness)
+
+            self.bbox.draw(image, track_color, 2)
+            self.bbox.draw(image, text_color, 1)
+
+            cv2.putText(image,
+                        "{}".format(self.id[:6]),
+                        (self.bbox.xmax-60, self.bbox.ymax-8),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        text_color,
+                        1)
+            cv2.putText(image,
+                        self.label,
+                        (self.bbox.xmin+5, self.bbox.ymax-8),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, text_color, 1)
+            if "facial_landmarks" in self.features:
+                self.features["facial_landmarks"].draw(image,
+                                                       track_color,
+                                                       thickness)
+        else:
+            self.bbox.draw(image, track_color, 1)
 
     # def project_into(self, camera_track):
     #     """Returns the 2D bbox in the given camera plane"""
