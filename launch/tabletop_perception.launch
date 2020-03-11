@@ -19,6 +19,11 @@
   <arg name="face_detector_weights_filename" default="$(find uwds3_perception)/models/detection/opencv_face_detector.pbtxt"/>
   <arg name="face_detector_config_filename" default="$(find uwds3_perception)/config/detection/face_config.yaml"/>
 
+  <!-- Hand detector model parameters -->
+  <arg name="hand_detector_model_filename" default="$(find uwds3_perception)/models/detection/hand_detection.pb"/>
+  <arg name="hand_detector_weights_filename" default="$(find uwds3_perception)/models/detection/hand_detection.pbtxt"/>
+  <arg name="hand_detector_config_filename" default="$(find uwds3_perception)/config/detection/hand_config.yaml"/>
+
   <!-- Head pose estimation parameters -->
   <arg name="shape_predictor_config_filename" default="$(find uwds3_perception)/models/estimation/shape_predictor_68_face_landmarks.dat"/>
   <arg name="face_3d_model_filename" default="$(find uwds3_perception)/config/estimation/face_3d_model.npy"/>
@@ -26,14 +31,13 @@
   <arg name="facial_features_model_filename" default="$(find uwds3_perception)/models/features/nn4.small2.v1.t7"/>
 
   <!-- Tracker parameters -->
-  <arg name="n_init" default="10"/>
+  <arg name="n_init" default="13"/>
   <arg name="n_frame" default="3"/>
-  <arg name="max_iou_distance" default="0.4"/>
-  <arg name="max_color_distance" default="0.4"/>
-  <arg name="max_face_distance" default="0.4"/>
+  <arg name="max_iou_distance" default="0.65"/>
+  <arg name="max_color_distance" default="0.1"/>
   <arg name="max_centroid_distance" default="0.4"/>
-  <arg name="max_disappeared" default="8"/>
-  <arg name="max_age" default="10"/>
+  <arg name="max_disappeared" default="3"/>
+  <arg name="max_age" default="20"/>
 
   <!-- Other parameters -->
   <arg name="publish_visualization_image" default="true"/>
@@ -59,6 +63,10 @@
       face_detector_weights_filename: $(arg face_detector_weights_filename)
       face_detector_config_filename: $(arg face_detector_config_filename)
 
+      hand_detector_model_filename: $(arg hand_detector_model_filename)
+      hand_detector_weights_filename: $(arg hand_detector_weights_filename)
+      hand_detector_config_filename: $(arg hand_detector_config_filename)
+
       shape_predictor_config_filename: $(arg shape_predictor_config_filename)
       face_3d_model_filename: $(arg face_3d_model_filename)
 
@@ -72,7 +80,6 @@
       n_init: $(arg n_init)
       max_iou_distance: $(arg max_iou_distance)
       max_color_distance: $(arg max_color_distance)
-      max_face_distance: $(arg max_face_distance)
       max_disappeared: $(arg max_disappeared)
       max_age: $(arg max_age)
     </rosparam>

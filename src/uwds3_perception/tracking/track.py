@@ -5,8 +5,7 @@ import uuid
 import uwds3_msgs
 import rospy
 from tf.transformations import euler_matrix
-from .single_object_trackers.medianflow_tracker import MedianflowTracker
-from .single_object_trackers.camshift_tracker import CamshiftTracker
+from .single_object_trackers.appearance_tracker import AppearanceTracker
 from pyuwds3.types.scene_node import SceneNode
 from pyuwds3.types.bbox_stable import BoundingBoxStable
 from pyuwds3.types.camera import HumanCamera
@@ -59,7 +58,7 @@ class Track(SceneNode):
 
         self.shapes = []
 
-        self.tracker = MedianflowTracker()
+        self.tracker = AppearanceTracker()
 
         if self.label == "face":
             self.camera = HumanCamera()
@@ -70,7 +69,7 @@ class Track(SceneNode):
 
         self.expiration_duration = 1.0
 
-    def update(self, detection):
+    def update(self, detection, perceived=True):
         """Updates the track's bbox"""
         self.bbox.update(detection.bbox.xmin,
                          detection.bbox.ymin,
@@ -95,8 +94,9 @@ class Track(SceneNode):
         # self.mask[] = mask
         for name, features in detection.features.items():
             self.features[name] = features
-        self.age = 0
-        self.hits += 1
+        if perceived is True:
+            self.age = 0
+            self.hits += 1
         if self.state == TrackState.TENTATIVE and self.hits >= self.n_init:
             self.state = TrackState.CONFIRMED
         if self.state == TrackState.OCCLUDED:

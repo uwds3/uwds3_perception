@@ -14,6 +14,7 @@ from std_msgs.msg import ColorRGBA
 class ShapeVisualizerNode(object):
     def __init__(self):
         self.tracks_topic = rospy.get_param("~tracks_topic", "tracks")
+        self.alpha = rospy.get_param("~alpha", 0.8)
         self.marker_id_map = {}
         self.tracks = {}
         self.track_marker = {}
@@ -80,10 +81,10 @@ class ShapeVisualizerNode(object):
                                                y=shape.dimensions[1],
                                                z=shape.dimensions[2])
                     elif shape.type == PrimitiveShape.MESH:
+                        marker.mesh_use_embedded_materials = True
                         if shape.mesh_resource != "":
                             marker.type = Marker.MESH_RESOURCE
                             marker.mesh_resource = shape.mesh_resource
-                            marker.mesh_use_embedded_materials = True
                         else:
                             marker.type = Marker.TRIANGLE_LIST
                             marker.points = shape.vertices
@@ -91,7 +92,7 @@ class ShapeVisualizerNode(object):
                     else:
                         raise NotImplementedError("Shape not implemented")
                     marker.color = shape.color
-                    marker.color.a = 0.75
+                    marker.color.a = self.alpha
                     marker.lifetime = rospy.Duration(0.25)
                     markers_msg.markers.append(marker)
         self.markers_publisher.publish(markers_msg)

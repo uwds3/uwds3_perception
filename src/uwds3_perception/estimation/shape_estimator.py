@@ -1,11 +1,12 @@
 import cv2
 import uwds3_msgs.msg
 from pyuwds3.types.shape.sphere import Sphere
+from pyuwds3.types.shape.box import Box
 from sklearn.cluster import KMeans
 from collections import Counter
 import numpy as np
 
-K = 3
+K = 4
 
 
 class ShapeEstimator(object):
@@ -21,27 +22,34 @@ class ShapeEstimator(object):
                                 shape = o.bbox.cylinder(camera_matrix, dist_coeffs)
                                 if o.label == "face":
                                     shape = Sphere(shape.width()*2.0)
+                                if o.label == "hand":
+                                    shape = Sphere(shape.width())
+                                if o.label == "table":
+                                    shape = Box(shape.height(), shape.width(), .01)
                                 shape.pose.pos.x = .0
                                 shape.pose.pos.y = .0
                                 shape.pose.pos.z = .0
-                                shape.color = self.__compute_dominant_color(rgb_image, o.bbox)
+                                shape.color = self.compute_dominant_color(rgb_image, o.bbox)
                                 o.shapes.append(shape)
                         else:
                             shape = o.bbox.cylinder(camera_matrix, dist_coeffs)
+                            z = o.pose.pos.z
                             shape.pose.pos.x = .0
                             shape.pose.pos.y = .0
-                            shape.pose.pos.z = .0
+                            shape.pose.pos.z = -(z - shape.h/2.0)/2.0
                             if not o.has_shape():
-                                shape.color = self.__compute_dominant_color(rgb_image, o.bbox)
-                                shape.w = 0.60
+                                shape.color = self.compute_dominant_color(rgb_image, o.bbox)
+                                shape.w = 0.50
+                                shape.h = z + shape.h/2.0
                                 o.shapes.append(shape)
                             else:
-                                o.shapes[0].w = 0.60
+                                o.shapes[0].w = 0.50
+                                shape.h = z + shape.h/2.0
                                 o.shapes[0].h = shape.h
             except Exception as e:
                 pass
 
-    def __compute_dominant_color(self, rgb_image, bbox):
+    def compute_dominant_color(self, rgb_image, bbox):
         xmin = int(bbox.xmin)
         ymin = int(bbox.ymin)
         h = int(bbox.height())

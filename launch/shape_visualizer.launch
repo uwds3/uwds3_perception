@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
   <arg name="tracks_topic" default="tracks"/>
+  <arg name="alpha" default="0.88"/>
 
   <node name="shape_visualizer" pkg="uwds3_perception" type="shape_visualizer_node.py" args="" output="screen" respawn="false">
     <rosparam subst_value="true">
       tracks_topic: $(arg tracks_topic)
+      alpha: $(arg alpha)
     </rosparam>
   </node>
 

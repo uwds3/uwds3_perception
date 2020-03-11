@@ -2,7 +2,6 @@ import numpy as np
 import rospy
 from pyuwds3.bbox_metrics import iou, overlap, centroid
 from .linear_assignment import LinearAssignment
-from .single_object_tracker import SingleObjectTracker
 from scipy.spatial.distance import euclidean, cosine
 from .track import Track
 
@@ -85,15 +84,10 @@ class MultiObjectTracker(object):
         for track_indice in remaining_tracks:
             self.tracks[track_indice].mark_missed()
             if self.use_appearance_tracker is True:
-                if self.tracks[track_indice].is_occluded():
+                if self.tracks[track_indice].is_confirmed():
                     success, detection = self.tracks[track_indice].tracker.predict(rgb_image, depth_image=depth_image)
                     if success is True:
-                        self.tracks[track_indice].update(detection)
-                else:
-                    if self.tracks[track_indice].is_confirmed():
-                        self.tracks[track_indice].predict_bbox()
-            else:
-                self.tracks[track_indice].predict_bbox()
+                        self.tracks[track_indice].update(detection, perceived=True)
 
         for detection_indice in remaining_detections:
             self.start_track(rgb_image, detections[detection_indice])

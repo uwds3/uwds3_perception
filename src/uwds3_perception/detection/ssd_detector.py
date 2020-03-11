@@ -8,7 +8,7 @@ from pyuwds3.types.detection import Detection
 class SSDDetector(object):
     """  """
 
-    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.6, swapRB=False):
+    def __init__(self, model, weights, config_file_path, input_size, max_overlap_ratio=0.3, swapRB=False):
         """  """
         with open(config_file_path, "r") as f:
             self.config = yaml.load(f)
@@ -43,7 +43,8 @@ class SSDDetector(object):
                 if self.config[class_id]["activated"] is True:
                     if confidence > self.config[class_id]["confidence_threshold"]:
 
-                        class_label = self.config[class_id]["label"] if self.config[class_id]["confidence_threshold"] > 0.6 else "thing"
+                        class_label = self.config[class_id]["label"]
+
                         xmin = int(detections[0, 0, i, 3] * cols)
                         ymin = int(detections[0, 0, i, 4] * rows)
                         xmax = int(detections[0, 0, i, 5] * cols)
@@ -99,11 +100,11 @@ class SSDDetector(object):
         y1 = boxes[:, 1]
         x2 = boxes[:, 2]
         y2 = boxes[:, 3]
-        #scores = boxes[:, 4]
+        scores = boxes[:, 4]
 
         area = (x2 - x1 + 1) * (y2 - y1 + 1)
 
-        idxs = np.argsort(area)
+        idxs = np.argsort(scores)
 
         while len(idxs) > 0:
             last = len(idxs) - 1

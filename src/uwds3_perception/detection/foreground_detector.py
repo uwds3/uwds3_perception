@@ -21,7 +21,7 @@ class ForegroundDetector(object):
         self.interactive_mode = interactive_mode
         self.roi_points = []
         self.state = DetectorState.INIT
-        self.background_substraction = cv2.createBackgroundSubtractorMOG2(history=200, varThreshold=130, detectShadows=True)
+        self.background_substraction = cv2.createBackgroundSubtractorMOG2(history=200, varThreshold=50, detectShadows=True)
 
         if self.interactive_mode is True:
             cv2.namedWindow("select_roi")
@@ -72,17 +72,13 @@ class ForegroundDetector(object):
 
         for c in contours:
             peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, 15 * 10e-5 * peri, True)
+            approx = cv2.approxPolyDP(c, 10e-3 * peri, True)
             xmin, ymin, w, h = cv2.boundingRect(approx)
-            if w > 30 and h > 30 and w < rgb_image.shape[1] and h < rgb_image.shape[0]:
+            if w > 10 and h > 10 and w < rgb_image.shape[1] and h < rgb_image.shape[0]:
                 filtered_bbox.append(np.array([xmin, ymin, xmin+w, ymin+h]))
 
         if self.interactive_mode is True:
             debug_image = cv2.cvtColor(opening.copy(), cv2.COLOR_GRAY2BGR)
-            # if len(self.roi_points) == 2 and self.state == DetectorState.RUNNING:
-            #     debug_image = cv2.cvtColor(opening.copy(), cv2.COLOR_GRAY2BGR)
-            # else:
-            #     debug_image = bgr_image.copy()
             if len(self.roi_points) == 1:
                 opening = cv2.rectangle(debug_image, self.roi_points[0], self.roi_points[0], (0, 255, 0), 3)
             elif len(self.roi_points) == 2:

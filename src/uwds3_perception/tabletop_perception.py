@@ -9,6 +9,9 @@ from uwds3_msgs.msg import SceneChangesStamped
 from cv_bridge import CvBridge
 import tf2_ros
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster
+from pyuwds3.types.detection import Detection
+from pyuwds3.types.shape.box import Box
+from .tracking.track import Track
 from .detection.ssd_detector import SSDDetector
 from .detection.foreground_detector import ForegroundDetector
 from .tracking.multi_object_tracker import MultiObjectTracker, iou_cost, color_cost, centroid_cost
@@ -50,33 +53,25 @@ class TabletopPerception(object):
         detector_weights_filename = rospy.get_param("~detector_weights_filename", "")
         detector_config_filename = rospy.get_param("~detector_config_filename", "")
 
-        face_detector_model_filename = rospy.get_param("~face_detector_model_filename", "")
-        face_detector_weights_filename = rospy.get_param("~face_detector_weights_filename", "")
-        face_detector_config_filename = rospy.get_param("~face_detector_config_filename", "")
+        hand_detector_model_filename = rospy.get_param("~hand_detector_model_filename", "")
+        hand_detector_weights_filename = rospy.get_param("~hand_detector_weights_filename", "")
+        hand_detector_config_filename = rospy.get_param("~hand_detector_config_filename", "")
 
         self.detector = SSDDetector(detector_model_filename,
                                     detector_weights_filename,
                                     detector_config_filename,
                                     300)
 
-        self.face_detector = SSDDetector(face_detector_model_filename,
-                                         face_detector_weights_filename,
-                                         face_detector_config_filename,
+        self.hand_detector = SSDDetector(hand_detector_model_filename,
+                                         hand_detector_weights_filename,
+                                         hand_detector_config_filename,
                                          300)
 
         self.foreground_detector = ForegroundDetector(interactive_mode=False)
 
-        shape_predictor_config_filename = rospy.get_param("~shape_predictor_config_filename", "")
-        self.facial_landmarks_estimator = FacialLandmarksEstimator(shape_predictor_config_filename)
-        face_3d_model_filename = rospy.get_param("~face_3d_model_filename", "")
-        self.head_pose_estimator = HeadPoseEstimator(face_3d_model_filename)
-
-        facial_features_model_filename = rospy.get_param("~facial_features_model_filename", "")
-        self.facial_features_estimator = FacialFeaturesEstimator(face_3d_model_filename, facial_features_model_filename)
-
         self.color_features_estimator = ColorFeaturesEstimator()
 
-        self.n_frame = rospy.get_param("~n_frame", 4)
+        self.n_frame = rospy.get_param("~n_frame", 3)
         self.frame_count = 0
 
         self.publish_tf = rospy.get_param("~publish_tf", True)
@@ -85,37 +80,31 @@ class TabletopPerception(object):
         self.n_init = rospy.get_param("~n_init", 1)
         self.max_iou_distance = rospy.get_param("~max_iou_distance", 0.8)
         self.max_color_distance = rospy.get_param("~max_color_distance", 0.2)
-        self.max_face_distance = rospy.get_param("~max_face_distance", 0.8)
         self.max_centroid_distance = rospy.get_param("~max_centroid_distance", 0.8)
         self.max_disappeared = rospy.get_param("~max_disappeared", 7)
         self.max_age = rospy.get_param("~max_age", 10)
 
         self.object_tracker = MultiObjectTracker(iou_cost,
                                                  color_cost,
-                                                 self.max_iou_distance,
-                                                 self.max_color_distance,
+                                                 0.35,
+                                                 0.3,
                                                  self.n_init,
-                                                 self.max_disappeared,
+                                                 40,
                                                  self.max_age,
-                                                 use_appearance_tracker=False)
-
-        self.face_tracker = MultiObjectTracker(iou_cost,
-                                               centroid_cost,
-                                               self.max_iou_distance,
-                                               None,
-                                               self.n_init,
-                                               self.max_disappeared,
-                                               self.max_age,
-                                               use_appearance_tracker=False)
+                                                 use_appearance_tracker=True)
 
         self.person_tracker = MultiObjectTracker(iou_cost,
                                                  color_cost,
                                                  self.max_iou_distance,
                                                  self.max_color_distance,
-                                                 self.n_init,
+                                                 5,
                                                  self.max_disappeared,
                                                  self.max_age,
                                                  use_appearance_tracker=True)
+
+        self.table_track = None
+        self.table_depth = None
+        self.table_shape = None
 
         self.shape_estimator = ShapeEstimator()
 
@@ -162,7 +151,7 @@ class TabletopPerception(object):
             if self.publish_visualization_image is True:
                 viz_frame = bgr_image
 
-            _, image_height, image_width = bgr_image.shape
+            image_height, image_width, _ = bgr_image.shape
 
             success, view_pose = self.get_pose_from_tf2(self.global_frame_id, self.camera_frame_id)
 
@@ -177,17 +166,56 @@ class TabletopPerception(object):
                 ######################################################
 
                 detections = []
-                if self.frame_count == 0:
-                    detections = self.detector.detect(rgb_image, depth_image=depth_image)
-                    object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image, prior_detections=detections)
-                    detections += object_detections
-                elif self.frame_count == 1:
-                    detections = self.face_detector.detect(rgb_image, depth_image=depth_image)
-                    #object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image)
-                    #detections += object_detections
-                else:
-                    object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image, prior_detections=detections)
 
+                if depth_image is not None:
+                    if self.table_depth is None:
+                        x = int(image_width*(1/2.0))
+                        y = int(image_height*(3/4.0))
+                        if not math.isnan(depth_image[y, x]):
+                            self.table_depth = depth_image[y, x]/1000.0
+                    table_depth = self.table_depth
+                else:
+                    table_depth = None
+                table_detection = Detection(0, int(image_height/2.0), int(image_width), image_height, "table", 1.0, table_depth)
+
+                if depth_image is not None:
+                    if self.table_shape is None:
+                        fx = self.camera_matrix[0][0]
+                        fy = self.camera_matrix[1][1]
+                        cx = self.camera_matrix[0][2]
+                        cy = self.camera_matrix[1][2]
+                        x = int(image_width*(1/2.0))
+                        y = int(image_height*(3/4.0))
+                        if not math.isnan(depth_image[y, x]):
+                            z = depth_image[y, x]/1000.0
+                            x = (x - cx) * z / fx
+                            y = (y - cy) * z / fy
+                            table_border = Vector6D(x=x, y=y, z=z)
+                            x = int(image_width*(1/2.0))
+                            y = int(image_height*(1/2.0))
+                            if not math.isnan(depth_image[y, x]):
+                                z = depth_image[y, x]/1000.0
+                                x = (x - cx) * z / fx
+                                y = (y - cy) * z / fy
+                                table_center = Vector6D(x=x, y=y, z=z)
+                                table_length = (image_width - cx) * z / fx
+                                table_width = 2.0*math.sqrt(pow(table_border.pos.x-table_center.pos.x, 2)+pow(table_border.pos.y-table_center.pos.y, 2)+pow(table_border.pos.z-table_center.pos.z, 2))
+                                center_in_world = view_pose+table_center
+                                real_z = center_in_world.position().z
+                                print view_pose.position()
+                                print center_in_world.position()
+                                self.table_shape = Box(table_width, table_length, real_z)
+                                self.table_shape.pose.pos.z = -real_z/2.0
+                                self.table_shape.color = self.shape_estimator.compute_dominant_color(rgb_image, table_detection.bbox)
+
+                if self.frame_count == 0:
+                    person_detections = self.detector.detect(rgb_image, depth_image=depth_image)
+                    detections = person_detections
+                elif self.frame_count == 1:
+                    object_detections = self.foreground_detector.detect(rgb_image, depth_image=depth_image)
+                    detections = object_detections
+                else:
+                    detections = []
                 ####################################################################
                 # Features estimation
                 ####################################################################
@@ -199,38 +227,32 @@ class TabletopPerception(object):
                 ######################################################
 
                 if self.frame_count == 0:
-                    object_detections = [d for d in detections if d.label != "person"]
-                    person_detections = [d for d in detections if d.label == "person"]
-                    face_tracks = self.face_tracker.update(rgb_image, [])
-                    object_tracks = self.object_tracker.update(rgb_image, object_detections)
-                    person_tracks = self.person_tracker.update(rgb_image, person_detections)
+                    object_tracks = self.object_tracker.update(rgb_image, [], depth_image=depth_image)
+                    person_tracks = self.person_tracker.update(rgb_image, person_detections, depth_image=depth_image)
                 elif self.frame_count == 1:
-                    face_tracks = self.face_tracker.update(rgb_image, detections)
-                    object_tracks = self.object_tracker.update(rgb_image, [])
-                    person_tracks = self.person_tracker.update(rgb_image, [])
+                    object_tracks = self.object_tracker.update(rgb_image, object_detections, depth_image=depth_image)
+                    person_tracks = self.person_tracker.update(rgb_image, [], depth_image=depth_image)
                 else:
-                    face_tracks = self.face_tracker.update(rgb_image, [])
-                    object_tracks = self.object_tracker.update(rgb_image, [])
-                    person_tracks = self.person_tracker.update(rgb_image, [])
+                    object_tracks = self.object_tracker.update(rgb_image, [], depth_image=depth_image)
+                    person_tracks = self.person_tracker.update(rgb_image, [], depth_image=depth_image)
 
-                tracks = face_tracks + object_tracks + person_tracks
+                if self.table_track is None:
+                    self.table_track = Track(table_detection, 1, 4, 20)
+                else:
+                    self.table_track.update(table_detection)
+                if self.table_shape is not None:
+                    self.table_track.shapes = [self.table_shape]
+                table_track = [self.table_track]
+
+                tracks = object_tracks + person_tracks + table_track
 
                 ########################################################
                 # Pose & Shape estimation
                 ########################################################
 
-                self.facial_landmarks_estimator.estimate(rgb_image, face_tracks)
-
-                self.head_pose_estimator.estimate(face_tracks, view_matrix, self.camera_matrix, self.dist_coeffs)
-                self.object_pose_estimator.estimate(object_tracks + person_tracks, view_matrix, self.camera_matrix, self.dist_coeffs)
+                self.object_pose_estimator.estimate(object_tracks + person_tracks + table_track, view_matrix, self.camera_matrix, self.dist_coeffs)
 
                 self.shape_estimator.estimate(rgb_image, tracks, self.camera_matrix, self.dist_coeffs)
-
-                ########################################################
-                # Recognition
-                ########################################################
-
-                self.facial_features_estimator.estimate(rgb_image, face_tracks)
 
                 self.frame_count += 1
                 ######################################################
@@ -250,8 +272,6 @@ class TabletopPerception(object):
                 header = bgr_image_msg.header
                 header.frame_id = self.global_frame_id
                 scene_changes.header = header
-
-                cv2.line(viz_frame, (0, image_height/2), (image_width, image_height/2), (0, 255, 0), 1)
 
                 for track in tracks:
                     if self.publish_visualization_image is True:
